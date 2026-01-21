@@ -195,14 +195,14 @@ app.get('/users/:id', async (req, res) => {
 
 ### Wrapping External Libraries
 
-Use `tryFn` or `tryAsync` to wrap functions that throw:
+Use `errore.try` or `errore.tryAsync` to wrap functions that throw:
 
 ```ts
 import * as errore from 'errore'
 
 // Sync: JSON parsing
 function parseJson(input: string): ValidationError | unknown {
-  const result = errore.tryFn({
+  const result = errore.try({
     try: () => JSON.parse(input),
     catch: () => new ValidationError({ field: 'json', message: 'Invalid JSON' })
   })
@@ -358,7 +358,7 @@ try {
 import * as errore from 'errore'
 
 const config = errore.unwrapOr(
-  errore.tryFn(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
+  errore.try(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
   { port: 3000, debug: false }
 )
 ```
@@ -615,7 +615,7 @@ async function legacyHandler(id: string) {
 
 ```ts
 import * as errore from 'errore'
-// errore.tryFn        - wrap sync throwing function
+// errore.try          - wrap sync throwing function
 // errore.tryAsync     - wrap async throwing function
 // errore.isError      - check if value is error (type guard)
 // errore.isOk         - check if value is NOT error

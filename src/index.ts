@@ -2,7 +2,7 @@
 export type { Errore, InferError, InferValue, EnsureNotError } from './types.js'
 
 // Core functions
-export { isError, isOk, tryFn, tryAsync } from './core.js'
+export { isError, isOk, tryFn, tryFn as try, tryAsync } from './core.js'
 
 // Transformations
 export { map, mapError, andThen, andThenAsync, tap, tapAsync } from './transform.js'

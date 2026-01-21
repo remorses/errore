@@ -161,10 +161,10 @@ if (errore.isError(result)) {
 import * as errore from 'errore'
 
 // Sync - wraps exceptions in UnhandledError
-const parsed = errore.tryFn(() => JSON.parse(input))
+const parsed = errore.try(() => JSON.parse(input))
 
 // Sync - with custom error type
-const parsed = errore.tryFn({
+const parsed = errore.try({
   try: () => JSON.parse(input),
   catch: e => new ParseError({ cause: e })
 })
