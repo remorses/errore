@@ -1,7 +1,5 @@
 # errore
 
-> **Note:** Always use `import * as errore from 'errore'` instead of named imports. This makes code easier to move between files, and more readable for people unfamiliar with errore since every function call is clearly namespaced (e.g. `errore.isError()` instead of just `isError()`).
-
 Type-safe errors as values for TypeScript. Like Go, but with full type inference.
 
 ## Why?
@@ -386,6 +384,10 @@ With errore:
 | `result.map(fn)` | `map(result, fn)` |
 | `Result<User, Error>` | `Error \| User` |
 | `Result<Option<T>, E>` | `Error \| T \| null` |
+
+## Import Style
+
+> **Note:** Always use `import * as errore from 'errore'` instead of named imports. This makes code easier to move between files, and more readable for people unfamiliar with errore since every function call is clearly namespaced (e.g. `errore.isError()` instead of just `isError()`).
 
 ## License
 
