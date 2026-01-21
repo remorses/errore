@@ -15,7 +15,7 @@ import {
   matchError,
   matchErrorPartial,
   UnhandledError,
-} from './index'
+} from './index.js'
 
 // ============================================================================
 // Tagged Error Definitions
@@ -336,7 +336,7 @@ describe('async composition', () => {
   })
 
   test('async with andThenAsync', async () => {
-    const { andThenAsync } = await import('./index')
+    const { andThenAsync } = await import('./index.js')
 
     const result = await andThenAsync(
       await fetchValue('123'),
