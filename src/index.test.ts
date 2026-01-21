@@ -707,3 +707,87 @@ describe('complex: Error | T | null | undefined', () => {
     expect(rows).toEqual([])
   })
 })
+
+// ============================================================================
+// Custom Base Class
+// ============================================================================
+
+describe('TaggedError with custom base class', () => {
+  class AppError extends Error {
+    statusCode: number = 500
+
+    report() {
+      return `[${this.statusCode}] ${this.message}`
+    }
+  }
+
+  class NotFoundAppError extends TaggedError('NotFoundAppError', AppError)<{
+    id: string
+    message: string
+  }>() {
+    statusCode = 404
+  }
+
+  class ServerAppError extends TaggedError('ServerAppError', AppError)<{
+    message: string
+  }>() {}
+
+  test('inherits base class properties', () => {
+    const err = new NotFoundAppError({ id: '123', message: 'User not found' })
+
+    expect(err.statusCode).toBe(404)
+  })
+
+  test('inherits base class methods', () => {
+    const err = new NotFoundAppError({ id: '123', message: 'User not found' })
+
+    expect(err.report()).toBe('[404] User not found')
+  })
+
+  test('still has _tag property', () => {
+    const err = new NotFoundAppError({ id: '123', message: 'User not found' })
+
+    expect(err._tag).toBe('NotFoundAppError')
+  })
+
+  test('static is() still works', () => {
+    const err: Error = new NotFoundAppError({ id: '123', message: 'User not found' })
+
+    expect(NotFoundAppError.is(err)).toBe(true)
+    expect(ServerAppError.is(err)).toBe(false)
+  })
+
+  test('TaggedError.is() still works', () => {
+    const err = new NotFoundAppError({ id: '123', message: 'User not found' })
+
+    expect(TaggedError.is(err)).toBe(true)
+  })
+
+  test('instanceof base class', () => {
+    const err = new NotFoundAppError({ id: '123', message: 'User not found' })
+
+    expect(err instanceof AppError).toBe(true)
+    expect(err instanceof Error).toBe(true)
+  })
+
+  test('matchError works with custom base', () => {
+    function getError(): NotFoundAppError | ServerAppError {
+      return new NotFoundAppError({ id: '1', message: 'Not found' })
+    }
+
+    const err = getError()
+    const msg = matchError(err, {
+      NotFoundAppError: (e) => `404: ${e.id}`,
+      ServerAppError: (e) => `500: ${e.message}`,
+    })
+
+    expect(msg).toBe('404: 1')
+  })
+
+  test('default statusCode from base', () => {
+    const err = new ServerAppError({ message: 'Internal error' })
+
+    expect(err.statusCode).toBe(500)
+    expect(err.report()).toBe('[500] Internal error')
+  })
+})

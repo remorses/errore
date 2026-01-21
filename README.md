@@ -258,6 +258,41 @@ ValidationError.is(value)  // specific class
 errore.TaggedError.is(value)      // any tagged error
 ```
 
+### Custom Base Class
+
+Extend from your own base class to share functionality across all errors:
+
+```ts
+import * as errore from 'errore'
+
+// Custom base with shared functionality
+class AppError extends Error {
+  statusCode: number = 500
+  
+  report() {
+    sentry.captureException(this)
+  }
+}
+
+// Pass base class as second argument
+class NotFoundError extends errore.TaggedError('NotFoundError', AppError)<{
+  id: string
+  message: string
+}>() {
+  statusCode = 404
+}
+
+class ServerError extends errore.TaggedError('ServerError', AppError)<{
+  message: string
+}>() {}
+
+const err = new NotFoundError({ id: '123', message: 'User not found' })
+err.statusCode  // 404
+err.report()    // calls sentry
+err._tag        // 'NotFoundError'
+err instanceof AppError  // true
+```
+
 ## How Type Safety Works
 
 TypeScript narrows types after `instanceof Error` checks:
