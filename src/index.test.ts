@@ -1,6 +1,5 @@
 import { describe, test, expect } from 'vitest'
 import {
-  isError,
   isOk,
   tryFn,
   tryAsync,
@@ -58,10 +57,10 @@ function parseNumber(s: string): ValidationError | number {
 // Type Guards
 // ============================================================================
 
-describe('isError / isOk', () => {
-  test('isError returns true for errors', () => {
+describe('instanceof Error / isOk', () => {
+  test('instanceof Error returns true for errors', () => {
     const result = getUser(false)
-    expect(isError(result)).toBe(true)
+    expect(result instanceof Error).toBe(true)
   })
 
   test('isOk narrows to value type', () => {
@@ -75,16 +74,16 @@ describe('isError / isOk', () => {
 
   test('early return pattern (like Go)', () => {
     const user = getUser(true)
-    if (isError(user)) return
+    if (user instanceof Error) return
 
     // TypeScript knows: user is User
     expect(user.name).toBe('Alice')
   })
 
-  test('isError narrows to error type for matchError', () => {
+  test('instanceof Error narrows to error type for matchError', () => {
     const result = getUser(false)
 
-    if (isError(result)) {
+    if (result instanceof Error) {
       // TypeScript knows: result is NotFoundError
       expect(result.id).toBe('123')
     }
@@ -107,8 +106,8 @@ describe('tryFn', () => {
   test('returns UnhandledError on exception', () => {
     const result = tryFn(() => JSON.parse('invalid'))
 
-    expect(isError(result)).toBe(true)
-    if (isError(result)) {
+    expect(result instanceof Error).toBe(true)
+    if (result instanceof Error) {
       expect(result).toBeInstanceOf(UnhandledError)
     }
   })
@@ -119,7 +118,7 @@ describe('tryFn', () => {
       catch: () => new ValidationError({ field: 'json', message: 'Invalid JSON' }),
     })
 
-    if (isError(result)) {
+    if (result instanceof ValidationError) {
       // TypeScript knows: result is ValidationError
       expect(result.field).toBe('json')
     }
@@ -138,7 +137,7 @@ describe('tryAsync', () => {
   test('returns error on rejection', async () => {
     const result = await tryAsync(() => Promise.reject(new Error('fail')))
 
-    expect(isError(result)).toBe(true)
+    expect(result instanceof Error).toBe(true)
   })
 
   test('custom catch with async function', async () => {
@@ -147,7 +146,7 @@ describe('tryAsync', () => {
       catch: () => new NetworkError({ url: '/api', message: 'Failed' }),
     })
 
-    if (isError(result)) {
+    if (result instanceof Error) {
       // TypeScript knows: result is NetworkError
       expect(result.url).toBe('/api')
     }
@@ -170,7 +169,7 @@ describe('map', () => {
     const user = getUser(false)
     const result = map(user, (u) => u.name.toUpperCase())
 
-    expect(isError(result)).toBe(true)
+    expect(result instanceof Error).toBe(true)
   })
 })
 
@@ -179,7 +178,7 @@ describe('mapError', () => {
     const result = getUser(false)
     const mapped = mapError(result, (e) => new NetworkError({ url: '/api', message: e.message }))
 
-    if (isError(mapped)) {
+    if (mapped instanceof Error) {
       // TypeScript knows: mapped is NetworkError
       expect(mapped.url).toBe('/api')
     }
@@ -196,7 +195,7 @@ describe('andThen', () => {
   test('short-circuits on error', () => {
     const result = andThen(parseNumber('bad'), (n) => n * 2)
 
-    expect(isError(result)).toBe(true)
+    expect(result instanceof Error).toBe(true)
   })
 
   test('chains multiple errore functions', () => {
@@ -243,24 +242,24 @@ describe('composing multiple operations', () => {
   test('step-by-step composition with early returns', () => {
     function calculate(input: string): ValidationError | DivisionError | number {
       const parsed = parseNumber(input)
-      if (isError(parsed)) return parsed
+      if (parsed instanceof Error) return parsed
 
       const validated = validatePositive(parsed)
-      if (isError(validated)) return validated
+      if (validated instanceof Error) return validated
 
       return divide(100, validated)
     }
 
     expect(calculate('10')).toBe(10)
-    expect(isError(calculate('bad'))).toBe(true)
-    expect(isError(calculate('-5'))).toBe(true)
-    expect(isError(calculate('0'))).toBe(true)
+    expect(calculate('bad') instanceof Error).toBe(true)
+    expect(calculate('-5') instanceof Error).toBe(true)
+    expect(calculate('0') instanceof Error).toBe(true)
   })
 
   test('error type is union of all possible errors', () => {
     function calculate(input: string): ValidationError | DivisionError | number {
       const parsed = parseNumber(input)
-      if (isError(parsed)) return parsed
+      if (parsed instanceof Error) return parsed
 
       // Skip validatePositive to allow 0 through to divide
       return divide(100, parsed)
@@ -268,7 +267,7 @@ describe('composing multiple operations', () => {
 
     // TypeScript knows the error is ValidationError | DivisionError
     const result = calculate('0')  // divide by zero
-    if (isError(result)) {
+    if (result instanceof Error) {
       // Can use matchError with all possible error types
       const message = matchError(result, {
         ValidationError: (e) => `Validation: ${e.field}`,
@@ -286,14 +285,14 @@ describe('composing multiple operations', () => {
 
     function calculate(input: string): ValidationError | DivisionError | number {
       const parsed = parseNumber(input)
-      if (isError(parsed)) return parsed
+      if (parsed instanceof Error) return parsed
       return divide(100, parsed)
     }
 
     const result = calculate('0')
     const normalized = mapError(result, (e) => new AppError({ source: e._tag, message: e.message }))
 
-    if (isError(normalized)) {
+    if (normalized instanceof Error) {
       expect(normalized._tag).toBe('AppError')
       expect(normalized.source).toBe('DivisionError')
     }
@@ -323,16 +322,16 @@ describe('async composition', () => {
   test('async step-by-step composition', async () => {
     async function pipeline(id: string): Promise<NotFoundError | ValidationError | string> {
       const value = await fetchValue(id)
-      if (isError(value)) return value
+      if (value instanceof Error) return value
 
       const processed = await processValue(value)
-      if (isError(processed)) return processed
+      if (processed instanceof Error) return processed
 
       return processed
     }
 
     expect(await pipeline('123')).toBe('processed: 42')
-    expect(isError(await pipeline('missing'))).toBe(true)
+    expect((await pipeline('missing')) instanceof Error).toBe(true)
   })
 
   test('async with andThenAsync', async () => {
@@ -454,7 +453,7 @@ describe('matchError', () => {
 
     const result = fetchData()
 
-    if (isError(result)) {
+    if (result instanceof Error) {
       const message = matchError(result, {
         NotFoundError: (e) => `Missing: ${e.id}`,
         ValidationError: (e) => `Invalid: ${e.field}`,
@@ -470,7 +469,7 @@ describe('matchError', () => {
 
     const result = riskyOperation()
 
-    if (isError(result)) {
+    if (result instanceof Error) {
       const message = matchError(result, {
         NotFoundError: (e) => `Missing: ${e.id}`,
         _: (e) => `Plain error: ${e.message}`,
@@ -538,7 +537,7 @@ describe('real-world: fetch user flow', () => {
   test('success case', async () => {
     const user = await fetchUser('123')
 
-    if (isError(user)) return
+    if (user instanceof Error) return
 
     // TypeScript knows: user is User
     expect(user.name).toBe('Alice')
@@ -547,7 +546,7 @@ describe('real-world: fetch user flow', () => {
   test('error handling with matchError', async () => {
     const user = await fetchUser('not-found')
 
-    if (isError(user)) {
+    if (user instanceof Error) {
       const message = matchError(user, {
         NotFoundError: (e) => `User ${e.id} not found`,
         NetworkError: (e) => `Network error: ${e.message}`,
@@ -586,7 +585,7 @@ describe('Error | T | null (Result + Option combined)', () => {
   test('success case - returns value', () => {
     const user = findUser('123')
 
-    if (isError(user)) return
+    if (user instanceof Error) return
     if (user === null) return
 
     // TypeScript knows: user is User
@@ -596,17 +595,17 @@ describe('Error | T | null (Result + Option combined)', () => {
   test('null case - using ?? operator', () => {
     const user = findUser('missing')
 
-    if (isError(user)) return
+    if (user instanceof Error) return
 
     // Can use ?? naturally with null
     const name = user?.name ?? 'Anonymous'
     expect(name).toBe('Anonymous')
   })
 
-  test('error case - still works with isError', () => {
+  test('error case - still works with instanceof Error', () => {
     const user = findUser('error')
 
-    if (isError(user)) {
+    if (user instanceof Error) {
       expect(user.id).toBe('error')
     }
   })
@@ -614,7 +613,7 @@ describe('Error | T | null (Result + Option combined)', () => {
   test('optional chaining works naturally', () => {
     const user = findUser('missing')
 
-    if (isError(user)) return
+    if (user instanceof Error) return
 
     // ?. works because user is User | null
     const nameLength = user?.name?.length
@@ -628,7 +627,7 @@ describe('Error | T | null (Result + Option combined)', () => {
 
     const config = getConfig()
 
-    if (isError(config)) return
+    if (config instanceof Error) return
 
     // Chain ?. and ?? naturally
     const timeout = config?.timeout ?? 5000
@@ -646,7 +645,7 @@ describe('Error | T | undefined', () => {
   test('success returns value', () => {
     const value = lookup('exists')
 
-    if (isError(value)) return
+    if (value instanceof Error) return
     if (value === undefined) return
 
     expect(value).toBe('found-value')
@@ -655,17 +654,17 @@ describe('Error | T | undefined', () => {
   test('undefined case with ?? fallback', () => {
     const value = lookup('missing')
 
-    if (isError(value)) return
+    if (value instanceof Error) return
 
     const result = value ?? 'default'
     expect(result).toBe('default')
   })
 
-  test('error case still caught by isError', () => {
+  test('error case still caught by instanceof Error', () => {
     const value = lookup('error')
 
-    expect(isError(value)).toBe(true)
-    if (isError(value)) {
+    expect(value instanceof Error).toBe(true)
+    if (value instanceof Error) {
       expect(value.url).toBe('/lookup')
     }
   })
@@ -683,7 +682,7 @@ describe('complex: Error | T | null | undefined', () => {
   test('all branches narrowed correctly', () => {
     const result = query('SELECT *')
 
-    if (isError(result)) {
+    if (result instanceof Error) {
       // TypeScript: result is ValidationError
       return result.field
     }
@@ -700,7 +699,7 @@ describe('complex: Error | T | null | undefined', () => {
   test('combined with ?? for defaults', () => {
     const result = query('empty')
 
-    if (isError(result)) return
+    if (result instanceof Error) return
 
     // Works with null OR undefined
     const rows = result?.rows ?? []
