@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+
+- replace tsup with **tsc**
+- add **declaration source maps**
+- include **src** in package
+
 ## 0.8.1
 
 - **ESM only** - remove CJS build
