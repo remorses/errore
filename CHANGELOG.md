@@ -1,7 +1,12 @@
 # Changelog
 
+## 0.8.1
+
+- **ESM only** - remove CJS build
+
 ## 0.8.0
 
+- Fix **npm exports** - correct ESM/CJS paths (`index.js`/`index.cjs` not `.mjs`)
 - Add `createTaggedError` factory with `$variable` message interpolation
 - Variables in message templates are automatically extracted and required in constructor
 - Supports custom base class via `extends` option
