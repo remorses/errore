@@ -9,8 +9,8 @@ Instead of wrapping values in a `Result<T, E>` type, functions simply return `E 
 ```ts
 // Go-style: errors as values
 const user = await fetchUser(id)
-if (isError(user)) return user  // TypeScript narrows type
-console.log(user.name)          // user is now User, not Error | User
+if (user instanceof Error) return user  // TypeScript narrows type
+console.log(user.name)                  // user is now User, not Error | User
 ```
 
 ## Install
@@ -46,7 +46,7 @@ async function getUser(id: string): Promise<NotFoundError | DbError | User> {
     catch: e => new DbError({ message: 'Query failed', cause: e })
   })
   
-  if (errore.isError(result)) return result
+  if (result instanceof Error) return result
   if (!result) return new NotFoundError({ id })
   
   return result
@@ -55,7 +55,7 @@ async function getUser(id: string): Promise<NotFoundError | DbError | User> {
 // Caller handles errors explicitly
 const user = await getUser('123')
 
-if (errore.isError(user)) {
+if (user instanceof Error) {
   errore.matchError(user, {
     NotFoundError: e => console.log(`User ${e.id} not found`),
     DbError: e => console.log(`Database error: ${e.message}`)
@@ -130,7 +130,7 @@ async function updateUser(
 app.post('/users/:id', async (req, res) => {
   const result = await updateUser(req.params.id, req.body)
   
-  if (errore.isError(result)) {
+  if (result instanceof Error) {
     // All errors have toResponse() from AppError base
     return res.status(result.statusCode).json(result.toResponse())
   }
@@ -144,11 +144,9 @@ app.post('/users/:id', async (req, res) => {
 ### Type Guards
 
 ```ts
-import * as errore from 'errore'
-
 const result: NetworkError | User = await fetchUser(id)
 
-if (errore.isError(result)) {
+if (result instanceof Error) {
   // result is NetworkError
   return result
 }
@@ -218,10 +216,10 @@ const result = errore.andThen(
 // Or step by step (often clearer)
 function calculate(input: string): ValidationError | DivisionError | number {
   const parsed = parseNumber(input)
-  if (errore.isError(parsed)) return parsed
+  if (parsed instanceof Error) return parsed
 
   const validated = validatePositive(parsed)
-  if (errore.isError(validated)) return validated
+  if (validated instanceof Error) return validated
 
   return divide(100, validated)
 }
@@ -240,20 +238,20 @@ import * as errore from 'errore'
 
 async function processOrder(orderId: string): Promise<OrderError | Receipt> {
   const order = await fetchOrder(orderId)
-  if (errore.isError(order)) return order
+  if (order instanceof Error) return order
 
   const validated = validateOrder(order)
-  if (errore.isError(validated)) return validated
+  if (validated instanceof Error) return validated
 
   const payment = await processPayment(validated)
-  if (errore.isError(payment)) return payment
+  if (payment instanceof Error) return payment
 
   return generateReceipt(payment)
 }
 
 // Caller gets union of all possible errors
 const receipt = await processOrder('123')
-if (errore.isError(receipt)) {
+if (receipt instanceof Error) {
   const message = errore.matchError(receipt, {
     NotFoundError: e => `Order ${e.id} not found`,
     ValidationError: e => `Invalid: ${e.field}`,
@@ -404,7 +402,7 @@ function findUser(id: string): NotFoundError | User | null {
 const user = findUser('123')
 
 // Handle error first
-if (errore.isError(user)) {
+if (user instanceof Error) {
   return user.message  // TypeScript: user is NotFoundError
 }
 
@@ -433,7 +431,7 @@ function lookup(key: string): NetworkError | string | undefined {
 
 const value = lookup('key')
 
-if (errore.isError(value)) return value
+if (value instanceof Error) return value
 
 // ?? works naturally with undefined
 const result = value ?? 'default'
@@ -455,7 +453,7 @@ function query(sql: string): ValidationError | { rows: string[] } | null | undef
 
 const result = query('SELECT *')
 
-if (errore.isError(result)) {
+if (result instanceof Error) {
   return result.field  // TypeScript: ValidationError
 }
 
@@ -477,7 +475,7 @@ console.log(result.rows)
 
 With errore:
 - Use `?.` and `??` naturally
-- Check `isError()` or `=== null` in any order
+- Check `instanceof Error` or `=== null` in any order
 - No unwrapping ceremony
 - TypeScript infers everything
 
@@ -494,7 +492,7 @@ With errore:
 
 ## Import Style
 
-> **Note:** Always use `import * as errore from 'errore'` instead of named imports. This makes code easier to move between files, and more readable for people unfamiliar with errore since every function call is clearly namespaced (e.g. `errore.isError()` instead of just `isError()`).
+> **Note:** Use `import * as errore from 'errore'` for utility functions. This makes code easier to move between files, and more readable for people unfamiliar with errore since every function call is clearly namespaced (e.g. `errore.matchError()` instead of just `matchError()`).
 
 ## License
 

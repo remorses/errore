@@ -1,6 +1,6 @@
 # Migrating to errore
 
-> **Note:** Always use `import * as errore from 'errore'` instead of named imports. This makes code easier to move between files, and more readable for people unfamiliar with errore since every function call is clearly namespaced (e.g. `errore.isError()` instead of just `isError()`).
+> **Note:** Use `import * as errore from 'errore'` for utility functions. This makes code easier to move between files, and more readable for people unfamiliar with errore since every function call is clearly namespaced (e.g. `errore.matchError()` instead of just `matchError()`).
 
 This guide shows how to migrate a TypeScript codebase from try-catch exceptions to type-safe errors as values, Go-style.
 
@@ -20,13 +20,11 @@ try {
 
 You write:
 ```ts
-import * as errore from 'errore'
-
 const user = await fetchUser(id)
-if (errore.isError(user)) return user  // early return, like Go
+if (user instanceof Error) return user  // early return, like Go
 
 const posts = await fetchPosts(user.id)
-if (errore.isError(posts)) return posts
+if (posts instanceof Error) return posts
 
 return posts
 ```
@@ -120,7 +118,7 @@ async function getUserById(id: string): Promise<DbConnectionError | RecordNotFou
     catch: (e) => new DbConnectionError({ message: 'Database query failed', cause: e })
   })
   
-  if (errore.isError(result)) return result
+  if (result instanceof Error) return result
   if (!result) return new RecordNotFoundError({ table: 'users', id })
   
   return result
@@ -149,21 +147,19 @@ async function getFullUser(id: string): Promise<FullUser> {
 ### After: Early returns (Go-style)
 
 ```ts
-import * as errore from 'errore'
-
 type GetFullUserError = 
   | DbConnectionError 
   | RecordNotFoundError
 
 async function getFullUser(id: string): Promise<GetFullUserError | FullUser> {
   const user = await getUserById(id)
-  if (errore.isError(user)) return user
+  if (user instanceof Error) return user
 
   const profile = await getProfileByUserId(user.id)
-  if (errore.isError(profile)) return profile
+  if (profile instanceof Error) return profile
 
   const settings = await getSettingsByUserId(user.id)
-  if (errore.isError(settings)) return settings
+  if (settings instanceof Error) return settings
 
   return { ...user, profile, settings }
 }
@@ -179,7 +175,7 @@ import * as errore from 'errore'
 app.get('/users/:id', async (req, res) => {
   const user = await getFullUser(req.params.id)
   
-  if (errore.isError(user)) {
+  if (user instanceof Error) {
     const response = errore.matchError(user, {
       RecordNotFoundError: (e) => ({ status: 404, body: { error: `User ${e.id} not found` } }),
       DbConnectionError: (e) => ({ status: 500, body: { error: 'Database error' } }),
@@ -215,7 +211,7 @@ async function fetchJson<T>(url: string): Promise<NetworkError | T> {
     try: () => fetch(url),
     catch: (e) => new NetworkError({ url, message: `Fetch failed: ${e}` })
   })
-  if (errore.isError(response)) return response
+  if (response instanceof Error) return response
   
   if (!response.ok) {
     return new NetworkError({ url, status: response.status, message: `HTTP ${response.status}` })
@@ -242,13 +238,13 @@ async function findUserByEmail(email: string): Promise<DbConnectionError | User 
     catch: (e) => new DbConnectionError({ message: 'Query failed', cause: e })
   })
   
-  if (errore.isError(result)) return result
+  if (result instanceof Error) return result
   return result ?? null  // explicitly return null if not found
 }
 
 // Caller
 const user = await findUserByEmail('test@example.com')
-if (errore.isError(user)) return user
+if (user instanceof Error) return user
 if (user === null) {
   // Handle not found case
   return new RecordNotFoundError({ table: 'users', id: email })
@@ -288,19 +284,19 @@ async function createUserWithProfile(
 ): Promise<ValidationError | DbConnectionError | User> {
   // Validate
   const validated = validateCreateUser(input)
-  if (errore.isError(validated)) return validated
+  if (validated instanceof Error) return validated
 
   // Create user
   const user = await createUser(validated)
-  if (errore.isError(user)) return user
+  if (user instanceof Error) return user
 
   // Create default profile
   const profile = await createProfile({ userId: user.id, bio: '' })
-  if (errore.isError(profile)) return profile
+  if (profile instanceof Error) return profile
 
   // Send welcome email (don't fail if this fails)
   const emailResult = await sendWelcomeEmail(user.email)
-  if (errore.isError(emailResult)) {
+  if (emailResult instanceof Error) {
     console.warn('Failed to send welcome email:', emailResult.message)
     // Continue anyway
   }
@@ -325,9 +321,9 @@ async function getUserDashboard(
   ])
 
   // Check each result
-  if (errore.isError(userResult)) return userResult
-  if (errore.isError(postsResult)) return postsResult
-  if (errore.isError(statsResult)) return statsResult
+  if (userResult instanceof Error) return userResult
+  if (postsResult instanceof Error) return postsResult
+  if (statsResult instanceof Error) return statsResult
 
   return {
     user: userResult,
@@ -379,12 +375,10 @@ try {
 }
 ```
 
-**After:** Use `isError` + conditional
+**After:** Use `instanceof` + conditional
 ```ts
-import * as errore from 'errore'
-
 const fetchResult = await fetchUser(id)
-const user = errore.isError(fetchResult) && RecordNotFoundError.is(fetchResult)
+const user = fetchResult instanceof RecordNotFoundError
   ? await createDefaultUser(id)
   : fetchResult
 
@@ -477,10 +471,8 @@ try {
 
 **After:** Clean expression
 ```ts
-import * as errore from 'errore'
-
 const raw = await fetchValue()
-const value = errore.isError(raw) ? defaultValue : transform(raw)
+const value = raw instanceof Error ? defaultValue : transform(raw)
 ```
 
 #### Pattern 6: Cache with fallback to fetch
@@ -573,7 +565,7 @@ function loadConfig(): Config {
 
 The pattern is always:
 1. **Before:** `let x; try { x = ... } catch { x = ... }` (statements)
-2. **After:** `const x = errore.isError(result) ? fallback : result` (expression)
+2. **After:** `const x = result instanceof Error ? fallback : result` (expression)
 
 This makes code:
 - More readable (no mutation)
@@ -606,7 +598,7 @@ async function legacyHandler(id: string) {
 - [ ] Identify leaf functions (database, network, file I/O)
 - [ ] Migrate leaf functions to return `Error | Value`
 - [ ] Update function signatures with explicit error unions
-- [ ] Replace `try-catch` with `isError` checks and early returns
+- [ ] Replace `try-catch` with `instanceof Error` checks and early returns
 - [ ] Use `matchError` at top-level handlers for exhaustive handling
 - [ ] Use `| null` for optional values instead of `| undefined`
 - [ ] Add `_` handler in `matchError` if you need to catch unexpected errors
@@ -617,7 +609,7 @@ async function legacyHandler(id: string) {
 import * as errore from 'errore'
 // errore.try          - wrap sync throwing function
 // errore.tryAsync     - wrap async throwing function
-// errore.isError      - check if value is error (type guard)
+// instanceof Error    - check if value is error (type guard)
 // errore.isOk         - check if value is NOT error
 // errore.unwrap       - extract value or throw
 // errore.unwrapOr     - extract value or use fallback
@@ -636,11 +628,11 @@ function myFn(): MyError | string {
 
 // Early return pattern
 const result = myFn()
-if (errore.isError(result)) return result
+if (result instanceof Error) return result
 // result is string here
 
 // Handle at top level
-if (errore.isError(result)) {
+if (result instanceof Error) {
   const msg = errore.matchError(result, {
     MyError: e => e.message,
     _: e => `Unknown: ${e.message}`  // plain Error fallback
