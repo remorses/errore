@@ -49,33 +49,33 @@ Create typed errors for your domain using `createTaggedError`:
 
 ```ts
 // errors.ts
-import { createTaggedError } from 'errore'
+import * as errore from 'errore'
 
 // Database errors
-class DbConnectionError extends createTaggedError({
+class DbConnectionError extends errore.createTaggedError({
   name: 'DbConnectionError',
   message: '$message',
 }) {}
 
-class RecordNotFoundError extends createTaggedError({
+class RecordNotFoundError extends errore.createTaggedError({
   name: 'RecordNotFoundError',
   message: '$table with id $id not found',
 }) {}
 
 // Network errors
-class NetworkError extends createTaggedError({
+class NetworkError extends errore.createTaggedError({
   name: 'NetworkError',
   message: 'Request to $url failed: $reason',
 }) {}
 
 // Validation errors
-class ValidationError extends createTaggedError({
+class ValidationError extends errore.createTaggedError({
   name: 'ValidationError',
   message: 'Invalid $field: $reason',
 }) {}
 
 // Auth errors
-class UnauthorizedError extends createTaggedError({
+class UnauthorizedError extends errore.createTaggedError({
   name: 'UnauthorizedError',
   message: 'Unauthorized',
 }) {}
@@ -98,10 +98,10 @@ async function getUserById(id: string): Promise<User> {
 ### After: Function returns error or value
 
 ```ts
-import { tryAsync } from 'errore'
+import * as errore from 'errore'
 
 async function getUserById(id: string): Promise<DbConnectionError | RecordNotFoundError | User> {
-  const result = await tryAsync({
+  const result = await errore.tryAsync({
     try: () => db.query('SELECT * FROM users WHERE id = ?', [id]),
     catch: (e) => new DbConnectionError({ message: 'Database query failed', cause: e })
   })
@@ -158,13 +158,13 @@ async function getFullUser(id: string): Promise<GetFullUserError | FullUser> {
 At your API handlers or entry points, handle all errors explicitly:
 
 ```ts
-import { matchError } from 'errore'
+import * as errore from 'errore'
 
 app.get('/users/:id', async (req, res) => {
   const user = await getFullUser(req.params.id)
   
   if (user instanceof Error) {
-    const response = matchError(user, {
+    const response = errore.matchError(user, {
       RecordNotFoundError: (e) => ({ status: 404, body: { error: `${e.table} ${e.id} not found` } }),
       DbConnectionError: (e) => ({ status: 500, body: { error: 'Database error' } }),
     })
@@ -182,11 +182,11 @@ app.get('/users/:id', async (req, res) => {
 Use `tryFn` or `tryAsync` to wrap functions that throw:
 
 ```ts
-import { tryFn, tryAsync } from 'errore'
+import * as errore from 'errore'
 
 // Sync: JSON parsing
 function parseJson(input: string): ValidationError | unknown {
-  const result = tryFn({
+  const result = errore.tryFn({
     try: () => JSON.parse(input),
     catch: () => new ValidationError({ field: 'json', reason: 'Invalid JSON' })
   })
@@ -195,7 +195,7 @@ function parseJson(input: string): ValidationError | unknown {
 
 // Async: fetch wrapper
 async function fetchJson<T>(url: string): Promise<NetworkError | T> {
-  const response = await tryAsync({
+  const response = await errore.tryAsync({
     try: () => fetch(url),
     catch: (e) => new NetworkError({ url, reason: `Fetch failed: ${e}` })
   })
@@ -205,7 +205,7 @@ async function fetchJson<T>(url: string): Promise<NetworkError | T> {
     return new NetworkError({ url, reason: `HTTP ${response.status}` })
   }
   
-  const data = await tryAsync({
+  const data = await errore.tryAsync({
     try: () => response.json() as Promise<T>,
     catch: () => new NetworkError({ url, reason: 'Invalid JSON response' })
   })
@@ -218,10 +218,10 @@ async function fetchJson<T>(url: string): Promise<NetworkError | T> {
 Combine error handling with optional values naturally:
 
 ```ts
-import { tryAsync } from 'errore'
+import * as errore from 'errore'
 
 async function findUserByEmail(email: string): Promise<DbConnectionError | User | null> {
-  const result = await tryAsync({
+  const result = await errore.tryAsync({
     try: () => db.query('SELECT * FROM users WHERE email = ?', [email]),
     catch: (e) => new DbConnectionError({ message: 'Query failed', cause: e })
   })
@@ -265,7 +265,7 @@ function validateCreateUser(input: unknown): ValidationError | CreateUserInput {
 ### Multiple Sequential Operations
 
 ```ts
-import { isOk } from 'errore'
+import * as errore from 'errore'
 
 async function createUserWithProfile(
   input: CreateUserInput
@@ -335,12 +335,12 @@ try {
 }
 ```
 
-**After:** Use `unwrapOr` for a one-liner
+**After:** Use `errore.unwrapOr` for a one-liner
 ```ts
-import { tryFn, unwrapOr } from 'errore'
+import * as errore from 'errore'
 
-const config = unwrapOr(
-  tryFn(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
+const config = errore.unwrapOr(
+  errore.tryFn(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
   { port: 3000, debug: false }
 )
 ```
@@ -398,12 +398,12 @@ while (attempts < 3) {
 
 **After:** Loop with early break
 ```ts
-import { isOk } from 'errore'
+import * as errore from 'errore'
 
 async function fetchWithRetry(): Promise<NetworkError | Data> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const result = await fetchData()
-    if (isOk(result)) return result
+    if (errore.isOk(result)) return result
     
     if (attempt < 2) await sleep(1000)  // don't sleep on last attempt
   }
@@ -429,12 +429,12 @@ for (const id of ids) {
 }
 ```
 
-**After:** Use `partition` or filter
+**After:** Use `errore.partition` or filter
 ```ts
-import { partition } from 'errore'
+import * as errore from 'errore'
 
 const allResults = await Promise.all(ids.map(fetchItem))
-const [items, errors] = partition(allResults)
+const [items, errors] = errore.partition(allResults)
 
 // Log errors if needed
 errors.forEach(e => console.warn('Failed:', e.message))
@@ -477,27 +477,27 @@ try {
 
 **After:** Explicit flow
 ```ts
-import { isOk } from 'errore'
+import * as errore from 'errore'
 
 const cached = cache.get(key)  // returns Data | null
 
 const data = cached ?? await (async () => {
   const fetched = await fetchFromDb(key)
-  if (isOk(fetched)) cache.set(key, fetched)
+  if (errore.isOk(fetched)) cache.set(key, fetched)
   return fetched
 })()
 ```
 
 Or simpler:
 ```ts
-import { isOk } from 'errore'
+import * as errore from 'errore'
 
 async function getWithCache(key: string): Promise<DbError | Data> {
   const cached = cache.get(key)
   if (cached) return cached
   
   const fetched = await fetchFromDb(key)
-  if (isOk(fetched)) cache.set(key, fetched)
+  if (errore.isOk(fetched)) cache.set(key, fetched)
   
   return fetched
 }
@@ -519,28 +519,28 @@ try {
 }
 ```
 
-**After:** Chain with `??` and `unwrapOr`
+**After:** Chain with `??` and `errore.isOk`
 ```ts
-import { isOk } from 'errore'
+import * as errore from 'errore'
 
 const envConfig = loadFromEnv()      // ConfigError | Config
 const fileConfig = loadFromFile()    // ConfigError | Config
 
-const config = isOk(envConfig) ? envConfig
-  : isOk(fileConfig) ? fileConfig
+const config = errore.isOk(envConfig) ? envConfig
+  : errore.isOk(fileConfig) ? fileConfig
   : defaultConfig
 ```
 
 Or as a function:
 ```ts
-import { isOk } from 'errore'
+import * as errore from 'errore'
 
 function loadConfig(): Config {
   const sources = [loadFromEnv, loadFromFile]
   
   for (const load of sources) {
     const result = load()
-    if (isOk(result)) return result
+    if (errore.isOk(result)) return result
   }
   
   return defaultConfig
@@ -563,18 +563,18 @@ This makes code:
 You can convert one function at a time. Use `unwrap` at boundaries:
 
 ```ts
-import { unwrap } from 'errore'
+import * as errore from 'errore'
 
 // New code using errore
 async function getUser(id: string): Promise<DbConnectionError | User> {
   // ... returns error or value
 }
 
-// Old code that expects throws - use unwrap at the boundary
+// Old code that expects throws - use errore.unwrap at the boundary
 async function legacyHandler(id: string) {
   const user = await getUser(id)
-  // unwrap throws if error, returns value otherwise
-  return unwrap(user, 'Failed to get user')
+  // errore.unwrap throws if error, returns value otherwise
+  return errore.unwrap(user, 'Failed to get user')
 }
 ```
 
@@ -592,10 +592,10 @@ async function legacyHandler(id: string) {
 ## Quick Reference
 
 ```ts
-import { createTaggedError, tryFn, tryAsync, isOk, unwrap, unwrapOr, match, matchError } from 'errore'
+import * as errore from 'errore'
 
 // Define errors with $variable interpolation
-class MyError extends createTaggedError({
+class MyError extends errore.createTaggedError({
   name: 'MyError',
   message: 'Operation failed: $reason'
 }) {}
@@ -613,7 +613,7 @@ if (result instanceof Error) return result
 
 // Handle at top level
 if (result instanceof Error) {
-  const msg = matchError(result, {
+  const msg = errore.matchError(result, {
     MyError: e => e.reason,
     _: e => `Unknown: ${e.message}`  // plain Error fallback
   })

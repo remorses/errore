@@ -10,7 +10,7 @@
 ## 0.7.1
 
 - Export `tryFn` as `try` for cleaner API (`errore.try()` instead of `errore.tryFn()`)
-- Update README and MIGRATION docs to use `errore.try` and `errore.tryAsync`
+- Update README and MIGRATION docs to use `import * as errore` (namespace import preferred over named imports)
 
 ## 0.7.0
 

@@ -22,22 +22,22 @@ npm install errore
 ## Quick Start
 
 ```ts
-import { createTaggedError, tryAsync, matchError } from 'errore'
+import * as errore from 'errore'
 
 // Define typed errors with $variable interpolation
-class NotFoundError extends createTaggedError({
+class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found'
 }) {}
 
-class DbError extends createTaggedError({
+class DbError extends errore.createTaggedError({
   name: 'DbError',
   message: 'Database query failed: $reason'
 }) {}
 
 // Function returns Error | Value (no wrapper!)
 async function getUser(id: string): Promise<NotFoundError | DbError | User> {
-  const result = await tryAsync({
+  const result = await errore.tryAsync({
     try: () => db.query(id),
     catch: e => new DbError({ reason: e.message, cause: e })
   })
@@ -52,7 +52,7 @@ async function getUser(id: string): Promise<NotFoundError | DbError | User> {
 const user = await getUser('123')
 
 if (user instanceof Error) {
-  matchError(user, {
+  errore.matchError(user, {
     NotFoundError: e => console.log(`User ${e.id} not found`),
     DbError: e => console.log(`Database error: ${e.reason}`)
   })
@@ -68,7 +68,7 @@ console.log(user.name)
 A complete example with custom base class, HTTP status codes, and error reporting:
 
 ```ts
-import { createTaggedError } from 'errore'
+import * as errore from 'errore'
 
 // Base class with shared functionality
 class AppError extends Error {
@@ -80,19 +80,19 @@ class AppError extends Error {
 }
 
 // Specific errors with status codes and $variable interpolation
-class NotFoundError extends createTaggedError({
+class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
   message: '$resource not found',
   extends: AppError
 }) {}
 
-class ValidationError extends createTaggedError({
+class ValidationError extends errore.createTaggedError({
   name: 'ValidationError',
   message: 'Invalid $field: $reason',
   extends: AppError
 }) {}
 
-class UnauthorizedError extends createTaggedError({
+class UnauthorizedError extends errore.createTaggedError({
   name: 'UnauthorizedError',
   message: '$message',
   extends: AppError
@@ -140,10 +140,10 @@ app.post('/users/:id', async (req, res) => {
 Create typed errors with `$variable` interpolation in the message:
 
 ```ts
-import { createTaggedError } from 'errore'
+import * as errore from 'errore'
 
 // Variables are extracted from the message and required in constructor
-class NotFoundError extends createTaggedError({
+class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found in $database'
 }) {}
@@ -155,14 +155,14 @@ err.database  // 'users'
 err._tag      // 'NotFoundError'
 
 // Error without variables
-class EmptyError extends createTaggedError({
+class EmptyError extends errore.createTaggedError({
   name: 'EmptyError',
   message: 'Something went wrong'
 }) {}
 new EmptyError()  // no args required
 
 // With cause for error chaining
-class WrapperError extends createTaggedError({
+class WrapperError extends errore.createTaggedError({
   name: 'WrapperError',
   message: 'Failed to process $item'
 }) {}
@@ -173,7 +173,7 @@ class AppError extends Error {
   statusCode = 500
 }
 
-class HttpError extends createTaggedError({
+class HttpError extends errore.createTaggedError({
   name: 'HttpError',
   message: 'HTTP $status error',
   extends: AppError
@@ -199,22 +199,22 @@ if (result instanceof Error) {
 ### Try Functions
 
 ```ts
-import { tryFn, tryAsync } from 'errore'
+import * as errore from 'errore'
 
 // Sync - wraps exceptions in UnhandledError
-const parsed = tryFn(() => JSON.parse(input))
+const parsed = errore.tryFn(() => JSON.parse(input))
 
 // Sync - with custom error type
-const parsed = tryFn({
+const parsed = errore.tryFn({
   try: () => JSON.parse(input),
   catch: e => new ParseError({ reason: e.message, cause: e })
 })
 
 // Async
-const response = await tryAsync(() => fetch(url))
+const response = await errore.tryAsync(() => fetch(url))
 
 // Async - with custom error
-const response = await tryAsync({
+const response = await errore.tryAsync({
   try: () => fetch(url),
   catch: e => new NetworkError({ url, cause: e })
 })
@@ -223,72 +223,72 @@ const response = await tryAsync({
 ### Transformations
 
 ```ts
-import { map, mapError, andThen, tap } from 'errore'
+import * as errore from 'errore'
 
 // Transform value (if not error)
-const name = map(user, u => u.name)
+const name = errore.map(user, u => u.name)
 
 // Transform error
-const appError = mapError(dbError, e => new AppError({ cause: e }))
+const appError = errore.mapError(dbError, e => new AppError({ cause: e }))
 
 // Chain operations
-const posts = andThen(user, u => fetchPosts(u.id))
+const posts = errore.andThen(user, u => fetchPosts(u.id))
 
 // Side effects
-const logged = tap(user, u => console.log('Got user:', u.name))
+const logged = errore.tap(user, u => console.log('Got user:', u.name))
 ```
 
 ### Extraction
 
 ```ts
-import { unwrap, unwrapOr, match, partition } from 'errore'
+import * as errore from 'errore'
 
 // Extract or throw
-const user = unwrap(result)
-const user = unwrap(result, 'Custom error message')
+const user = errore.unwrap(result)
+const user = errore.unwrap(result, 'Custom error message')
 
 // Extract or fallback
-const name = unwrapOr(result, 'Anonymous')
+const name = errore.unwrapOr(result, 'Anonymous')
 
 // Pattern match
-const message = match(result, {
+const message = errore.match(result, {
   ok: user => `Hello, ${user.name}`,
   err: error => `Failed: ${error.message}`
 })
 
 // Split array into [successes, errors]
-const [users, errors] = partition(results)
+const [users, errors] = errore.partition(results)
 ```
 
 ### Error Matching
 
 ```ts
-import { createTaggedError, matchError, matchErrorPartial } from 'errore'
+import * as errore from 'errore'
 
-class ValidationError extends createTaggedError({
+class ValidationError extends errore.createTaggedError({
   name: 'ValidationError',
   message: 'Invalid $field'
 }) {}
 
-class NetworkError extends createTaggedError({
+class NetworkError extends errore.createTaggedError({
   name: 'NetworkError',
   message: 'Failed to fetch $url'
 }) {}
 
 // Exhaustive matching (TypeScript ensures all cases handled)
-const message = matchError(error, {
+const message = errore.matchError(error, {
   ValidationError: e => `Invalid ${e.field}`,
   NetworkError: e => `Failed to fetch ${e.url}`
 })
 
 // Handle plain Error with _ (underscore) handler
-const msg = matchError(err, {
+const msg = errore.matchError(err, {
   ValidationError: e => `Invalid ${e.field}`,
   _: e => `Plain error: ${e.message}`  // catches non-tagged Error
 })
 
 // Partial matching with fallback
-const fallbackMsg = matchErrorPartial(error, {
+const fallbackMsg = errore.matchErrorPartial(error, {
   ValidationError: e => `Invalid ${e.field}`
 }, e => `Unknown error: ${e.message}`)
 
@@ -321,9 +321,9 @@ This works because:
 One of errore's best features: you can naturally combine error handling with optional values. No wrapper nesting needed!
 
 ```ts
-import { createTaggedError } from 'errore'
+import * as errore from 'errore'
 
-class NotFoundError extends createTaggedError({
+class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
   message: 'Resource $id not found'
 }) {}
@@ -378,6 +378,10 @@ With errore:
 | `result.map(fn)` | `map(result, fn)` |
 | `Result<User, Error>` | `Error \| User` |
 | `Result<Option<T>, E>` | `Error \| T \| null` |
+
+## Import Style
+
+> **Note:** Always use `import * as errore from 'errore'` instead of named imports. This makes code easier to move between files, and more readable for people unfamiliar with errore since every function call is clearly namespaced (e.g. `errore.isOk()` instead of just `isOk()`).
 
 ## License
 
