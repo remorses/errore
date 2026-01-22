@@ -14,6 +14,7 @@ import {
   matchError,
   matchErrorPartial,
   UnhandledError,
+  createTaggedError,
 } from './index.js'
 
 // ============================================================================
@@ -788,5 +789,269 @@ describe('TaggedError with custom base class', () => {
 
     expect(err.statusCode).toBe(500)
     expect(err.report()).toBe('[500] Internal error')
+  })
+})
+
+// ============================================================================
+// createTaggedError Factory API
+// ============================================================================
+
+describe('createTaggedError factory', () => {
+  test('creates error with interpolated message', () => {
+    const NotFoundError = createTaggedError({
+      name: 'NotFoundError',
+      message: 'User $id not found in $database',
+    })
+
+    const err = new NotFoundError({ id: '123', database: 'users' })
+
+    expect(err.message).toBe('User 123 not found in users')
+    expect(err._tag).toBe('NotFoundError')
+    expect(err.name).toBe('NotFoundError')
+  })
+
+  test('assigns variables as properties', () => {
+    const NotFoundError = createTaggedError({
+      name: 'NotFoundError',
+      message: 'User $id not found in $database',
+    })
+
+    const err = new NotFoundError({ id: '123', database: 'users' })
+
+    expect(err.id).toBe('123')
+    expect(err.database).toBe('users')
+  })
+
+  test('static is() type guard works', () => {
+    const NotFoundError = createTaggedError({
+      name: 'NotFoundError',
+      message: 'User $id not found',
+    })
+
+    const err = new NotFoundError({ id: '123' })
+    const plainErr = new Error('plain')
+
+    expect(NotFoundError.is(err)).toBe(true)
+    expect(NotFoundError.is(plainErr)).toBe(false)
+  })
+
+  test('static tag property', () => {
+    const NotFoundError = createTaggedError({
+      name: 'NotFoundError',
+      message: 'User $id not found',
+    })
+
+    expect(NotFoundError.tag).toBe('NotFoundError')
+  })
+
+  test('error without variables requires no args', () => {
+    const EmptyError = createTaggedError({
+      name: 'EmptyError',
+      message: 'Something went wrong',
+    })
+
+    const err = new EmptyError()
+
+    expect(err.message).toBe('Something went wrong')
+    expect(err._tag).toBe('EmptyError')
+  })
+
+  test('supports cause for error chaining', () => {
+    const WrapperError = createTaggedError({
+      name: 'WrapperError',
+      message: 'Failed to process $item',
+    })
+
+    const originalError = new Error('original')
+    const err = new WrapperError({ item: 'data', cause: originalError })
+
+    expect(err.cause).toBe(originalError)
+    expect(err.message).toBe('Failed to process data')
+  })
+
+  test('cause stack is appended', () => {
+    const WrapperError = createTaggedError({
+      name: 'WrapperError',
+      message: 'Wrapper for $reason',
+    })
+
+    const cause = new Error('inner error')
+    const err = new WrapperError({ reason: 'testing', cause })
+
+    expect(err.stack).toContain('Caused by:')
+  })
+
+  test('toJSON includes all properties', () => {
+    const TestError = createTaggedError({
+      name: 'TestError',
+      message: 'Error with $code and $detail',
+    })
+
+    const err = new TestError({ code: 'E001', detail: 'something broke' })
+    const json = err.toJSON() as Record<string, unknown>
+
+    expect(json._tag).toBe('TestError')
+    expect(json.name).toBe('TestError')
+    expect(json.message).toBe('Error with E001 and something broke')
+    expect(json.code).toBe('E001')
+    expect(json.detail).toBe('something broke')
+  })
+
+  test('handles number values in interpolation', () => {
+    const StatusError = createTaggedError({
+      name: 'StatusError',
+      message: 'HTTP $status: $reason',
+    })
+
+    const err = new StatusError({ status: 404, reason: 'Not Found' })
+
+    expect(err.message).toBe('HTTP 404: Not Found')
+    expect(err.status).toBe(404)
+  })
+
+  test('handles variable at end of message', () => {
+    const EndError = createTaggedError({
+      name: 'EndError',
+      message: 'Missing $id',
+    })
+
+    const err = new EndError({ id: 'abc' })
+
+    expect(err.message).toBe('Missing abc')
+  })
+
+  test('handles variable followed by punctuation', () => {
+    const PunctError = createTaggedError({
+      name: 'PunctError',
+      message: 'Error: $code. Details: $info!',
+    })
+
+    const err = new PunctError({ code: 'E1', info: 'bad' })
+
+    expect(err.message).toBe('Error: E1. Details: bad!')
+  })
+
+  test('instanceof Error works', () => {
+    const TestError = createTaggedError({
+      name: 'TestError',
+      message: 'Test $val',
+    })
+
+    const err = new TestError({ val: '1' })
+
+    expect(err instanceof Error).toBe(true)
+  })
+
+  test('TaggedError.is() recognizes factory errors', () => {
+    const FactoryError = createTaggedError({
+      name: 'FactoryError',
+      message: 'Created via factory with $param',
+    })
+
+    const err = new FactoryError({ param: 'test' })
+
+    expect(TaggedError.is(err)).toBe(true)
+  })
+
+  test('works with matchError', () => {
+    const ErrorA = createTaggedError({
+      name: 'ErrorA',
+      message: 'Error A: $msg',
+    })
+    const ErrorB = createTaggedError({
+      name: 'ErrorB',
+      message: 'Error B: $msg',
+    })
+
+    function getError(type: string): InstanceType<typeof ErrorA> | InstanceType<typeof ErrorB> {
+      if (type === 'a') {
+        return new ErrorA({ msg: 'from A' })
+      }
+      return new ErrorB({ msg: 'from B' })
+    }
+
+    const err = getError('a')
+    const result = matchError(err, {
+      ErrorA: (e) => `Got A: ${e.msg}`,
+      ErrorB: (e) => `Got B: ${e.msg}`,
+    })
+
+    expect(result).toBe('Got A: from A')
+  })
+
+  test('preserves underscored variable names', () => {
+    const TestError = createTaggedError({
+      name: 'TestError',
+      message: 'Error with $user_id and $request_path',
+    })
+
+    const err = new TestError({ user_id: '123', request_path: '/api/test' })
+
+    expect(err.message).toBe('Error with 123 and /api/test')
+    expect(err.user_id).toBe('123')
+    expect(err.request_path).toBe('/api/test')
+  })
+
+  test('custom base class with extends option', () => {
+    class AppError extends Error {
+      statusCode = 500
+
+      report() {
+        return `[${this.statusCode}] ${this.message}`
+      }
+    }
+
+    const NotFoundError = createTaggedError({
+      name: 'NotFoundError',
+      message: 'Resource $id not found',
+      extends: AppError,
+    })
+
+    const err = new NotFoundError({ id: '123' })
+
+    expect(err.message).toBe('Resource 123 not found')
+    expect(err._tag).toBe('NotFoundError')
+    expect(err.statusCode).toBe(500)
+    expect(err.report()).toBe('[500] Resource 123 not found')
+    expect(err instanceof AppError).toBe(true)
+    expect(err instanceof Error).toBe(true)
+  })
+
+  test('custom base class with overridden properties', () => {
+    class HttpError extends Error {
+      statusCode = 500
+    }
+
+    // Create a factory error and then subclass it to override properties
+    const BaseNotFound = createTaggedError({
+      name: 'NotFoundError',
+      message: 'Not found: $resource',
+      extends: HttpError,
+    })
+
+    const err = new BaseNotFound({ resource: 'user' })
+
+    expect(err.statusCode).toBe(500)
+    expect(err.message).toBe('Not found: user')
+  })
+
+  test('custom base class static is() works', () => {
+    class CustomError extends Error {
+      custom = true
+    }
+
+    const TestError = createTaggedError({
+      name: 'TestError',
+      message: 'Test $val',
+      extends: CustomError,
+    })
+
+    const err = new TestError({ val: 'x' })
+    const plainErr = new Error('plain')
+    const customErr = new CustomError('custom')
+
+    expect(TestError.is(err)).toBe(true)
+    expect(TestError.is(plainErr)).toBe(false)
+    expect(TestError.is(customErr)).toBe(false)
   })
 })

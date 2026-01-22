@@ -13,3 +13,7 @@ export { unwrap, unwrapOr, match, partition, flatten } from './extract.js'
 // Tagged errors
 export { TaggedError, matchError, matchErrorPartial, isTaggedError, UnhandledError } from './error.js'
 export type { TaggedErrorInstance, TaggedErrorClass } from './error.js'
+
+// Factory API for tagged errors with $variable interpolation
+export { createTaggedError } from './factory.js'
+export type { FactoryTaggedErrorClass, FactoryTaggedErrorInstance } from './factory.js'
