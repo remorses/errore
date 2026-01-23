@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.0
+
+- **BREAKING:** rename `_` to `Error` in matchError handlers, fallback now always required
+- **fix:** only catch Error instances in tryFn/tryAsync, re-throw non-Error values
+
 ## 0.8.2
 
 - replace tsup with **tsc**
