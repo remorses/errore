@@ -54,7 +54,8 @@ const user = await getUser('123')
 if (user instanceof Error) {
   const message = errore.matchError(user, {
     NotFoundError: e => `User ${e.id} not found`,
-    DbError: e => `Database error: ${e.reason}`
+    DbError: e => `Database error: ${e.reason}`,
+    Error: e => `Unexpected error: ${e.message}`
   })
   console.log(message)
   return
@@ -278,18 +279,13 @@ class NetworkError extends errore.createTaggedError({
   message: 'Failed to fetch $url'
 }) {}
 
-// Exhaustive matching (TypeScript ensures all cases handled)
+// Exhaustive matching - Error handler is always required
 const message = errore.matchError(error, {
   ValidationError: e => `Invalid ${e.field}`,
-  NetworkError: e => `Failed to fetch ${e.url}`
+  NetworkError: e => `Failed to fetch ${e.url}`,
+  Error: e => `Unexpected: ${e.message}`  // required fallback for plain Error
 })
 console.log(message)  // side effects outside callbacks
-
-// Handle plain Error with _ (underscore) handler
-const msg = errore.matchError(err, {
-  ValidationError: e => `Invalid ${e.field}`,
-  _: e => `Plain error: ${e.message}`  // catches non-tagged Error
-})
 
 // Partial matching with fallback
 const fallbackMsg = errore.matchErrorPartial(error, {

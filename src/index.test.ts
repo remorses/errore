@@ -273,6 +273,7 @@ describe('composing multiple operations', () => {
       const message = matchError(result, {
         ValidationError: (e) => `Validation: ${e.field}`,
         DivisionError: (e) => `Division: ${e.message}`,
+        Error: (e) => `Unknown: ${e.message}`,
       })
       expect(message).toBe('Division: Cannot divide by zero')
     }
@@ -458,12 +459,13 @@ describe('matchError', () => {
       const message = matchError(result, {
         NotFoundError: (e) => `Missing: ${e.id}`,
         ValidationError: (e) => `Invalid: ${e.field}`,
+        Error: (e) => `Unknown: ${e.message}`,
       })
       expect(message).toBe('Missing: 123')
     }
   })
 
-  test('_ handler catches plain Error', () => {
+  test('Error handler catches plain Error', () => {
     function riskyOperation(): NotFoundError | Error | string {
       return new Error('Something went wrong')
     }
@@ -473,13 +475,13 @@ describe('matchError', () => {
     if (result instanceof Error) {
       const message = matchError(result, {
         NotFoundError: (e) => `Missing: ${e.id}`,
-        _: (e) => `Plain error: ${e.message}`,
+        Error: (e) => `Plain error: ${e.message}`,
       })
       expect(message).toBe('Plain error: Something went wrong')
     }
   })
 
-  test('_ handler with mixed tagged and plain errors', () => {
+  test('Error handler with mixed tagged and plain errors', () => {
     function getError(type: string): NotFoundError | ValidationError | Error {
       if (type === 'notfound') return new NotFoundError({ id: '1' })
       if (type === 'validation') return new ValidationError({ field: 'email', message: 'Invalid' })
@@ -491,21 +493,21 @@ describe('matchError', () => {
     const msg1 = matchError(err1, {
       NotFoundError: (e) => `NotFound: ${e.id}`,
       ValidationError: (e) => `Validation: ${e.field}`,
-      _: (e) => `Plain: ${e.message}`,
+      Error: (e) => `Plain: ${e.message}`,
     })
     expect(msg1).toBe('NotFound: 1')
 
-    // Plain Error goes to _ handler
+    // Plain Error goes to Error handler
     const err2 = getError('plain')
     const msg2 = matchError(err2, {
       NotFoundError: (e) => `NotFound: ${e.id}`,
       ValidationError: (e) => `Validation: ${e.field}`,
-      _: (e) => `Plain: ${e.message}`,
+      Error: (e) => `Plain: ${e.message}`,
     })
     expect(msg2).toBe('Plain: Unknown')
   })
 
-  test('matchErrorPartial with _ handler', () => {
+  test('matchErrorPartial with Error handler', () => {
     function getError(): NotFoundError | Error {
       return new Error('Oops')
     }
@@ -513,7 +515,7 @@ describe('matchError', () => {
     const err = getError()
     const message = matchErrorPartial(
       err,
-      { _: (e) => `Caught plain: ${e.message}` },
+      { Error: (e) => `Caught plain: ${e.message}` },
       () => 'fallback'
     )
     expect(message).toBe('Caught plain: Oops')
@@ -551,6 +553,7 @@ describe('real-world: fetch user flow', () => {
       const message = matchError(user, {
         NotFoundError: (e) => `User ${e.id} not found`,
         NetworkError: (e) => `Network error: ${e.message}`,
+        Error: (e) => `Unknown: ${e.message}`,
       })
       expect(message).toBe('User not-found not found')
     }
@@ -779,6 +782,7 @@ describe('TaggedError with custom base class', () => {
     const msg = matchError(err, {
       NotFoundAppError: (e) => `404: ${e.id}`,
       ServerAppError: (e) => `500: ${e.message}`,
+      Error: (e) => `Unknown: ${e.message}`,
     })
 
     expect(msg).toBe('404: 1')
@@ -974,6 +978,7 @@ describe('createTaggedError factory', () => {
     const result = matchError(err, {
       ErrorA: (e) => `Got A: ${e.msg}`,
       ErrorB: (e) => `Got B: ${e.msg}`,
+      Error: (e) => `Unknown: ${e.message}`,
     })
 
     expect(result).toBe('Got A: from A')

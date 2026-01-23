@@ -167,6 +167,7 @@ app.get('/users/:id', async (req, res) => {
     const response = errore.matchError(user, {
       RecordNotFoundError: (e) => ({ status: 404, body: { error: `${e.table} ${e.id} not found` } }),
       DbConnectionError: (e) => ({ status: 500, body: { error: 'Database error' } }),
+      Error: (e) => ({ status: 500, body: { error: 'Unexpected error' } }),
     })
     return res.status(response.status).json(response.body)
   }
@@ -585,9 +586,8 @@ async function legacyHandler(id: string) {
 - [ ] Migrate leaf functions to return `Error | Value`
 - [ ] Update function signatures with explicit error unions
 - [ ] Replace `try-catch` with `instanceof Error` checks and early returns
-- [ ] Use `matchError` at top-level handlers for exhaustive handling
+- [ ] Use `matchError` at top-level handlers for exhaustive handling (always include `Error` handler)
 - [ ] Use `| null` for optional values instead of `| undefined`
-- [ ] Add `_` handler in `matchError` if you need to catch unexpected errors
 
 ## Quick Reference
 
@@ -615,7 +615,7 @@ if (result instanceof Error) return result
 if (result instanceof Error) {
   const msg = errore.matchError(result, {
     MyError: e => e.reason,
-    _: e => `Unknown: ${e.message}`  // plain Error fallback
+    Error: e => `Unknown: ${e.message}`  // required fallback for plain Error
   })
   console.log(msg)
 }

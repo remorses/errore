@@ -150,30 +150,21 @@ type MatchHandlers<E extends AnyTaggedError, R> = {
 }
 
 /**
- * Handler map that includes `_` for plain Error (untagged)
+ * Handler map with required `Error` fallback for plain Error (untagged)
  */
 type MatchHandlersWithPlain<E extends Error, R> = {
   [K in Extract<E, AnyTaggedError>['_tag']]: (err: Extract<E, { _tag: K }>) => R
-} & (Exclude<E, AnyTaggedError> extends never
-  ? {}
-  : { _: (err: Exclude<E, AnyTaggedError>) => R })
+} & { Error: (err: Exclude<E, AnyTaggedError> extends never ? Error : Exclude<E, AnyTaggedError>) => R }
 
 /**
  * Exhaustive pattern match on error union by _tag.
- * Use `_` handler for plain Error instances without _tag.
+ * The `Error` handler is always required as fallback for plain Error instances.
  *
  * @example
- * // Tagged errors only
- * matchError(err, {
+ * const message = matchError(err, {
  *   NotFoundError: (e) => `Missing: ${e.id}`,
  *   ValidationError: (e) => `Invalid: ${e.field}`,
- * });
- *
- * @example
- * // Mixed tagged and plain Error
- * matchError(err, {
- *   NotFoundError: (e) => `Missing: ${e.id}`,
- *   _: (e) => `Unknown error: ${e.message}`,
+ *   Error: (e) => `Unknown error: ${e.message}`,
  * });
  */
 export function matchError<E extends Error, R>(err: E, handlers: MatchHandlersWithPlain<E, R>): R {
@@ -184,19 +175,15 @@ export function matchError<E extends Error, R>(err: E, handlers: MatchHandlersWi
       return handler(err)
     }
   }
-  // Fall through to _ handler for plain Error
-  const fallbackHandler = h['_']
-  if (fallbackHandler) {
-    return fallbackHandler(err)
-  }
-  throw new Error(`No handler for error: ${err.message}`)
+  // Fall through to Error handler for plain Error or unknown tagged errors
+  return h['Error'](err)
 }
 
 /**
  * Partial pattern match with fallback for unhandled tags.
  *
  * @example
- * matchErrorPartial(err, {
+ * const message = matchErrorPartial(err, {
  *   NotFoundError: (e) => `Missing: ${e.id}`,
  * }, (e) => `Unknown: ${e.message}`);
  */
@@ -212,10 +199,10 @@ export function matchErrorPartial<E extends Error, R>(
       return handler(err)
     }
   }
-  // Check for _ handler before fallback
-  const underscoreHandler = h['_']
-  if (underscoreHandler) {
-    return underscoreHandler(err)
+  // Check for Error handler before fallback
+  const errorHandler = h['Error']
+  if (errorHandler) {
+    return errorHandler(err)
   }
   return fallback(err)
 }
