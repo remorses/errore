@@ -52,10 +52,11 @@ async function getUser(id: string): Promise<NotFoundError | DbError | User> {
 const user = await getUser('123')
 
 if (user instanceof Error) {
-  errore.matchError(user, {
-    NotFoundError: e => console.log(`User ${e.id} not found`),
-    DbError: e => console.log(`Database error: ${e.reason}`)
+  const message = errore.matchError(user, {
+    NotFoundError: e => `User ${e.id} not found`,
+    DbError: e => `Database error: ${e.reason}`
   })
+  console.log(message)
   return
 }
 
@@ -262,6 +263,8 @@ const [users, errors] = errore.partition(results)
 
 ### Error Matching
 
+Always assign `matchError` results to a variable. Keep callbacks pure (return values only) and move side effects outside:
+
 ```ts
 import * as errore from 'errore'
 
@@ -280,6 +283,7 @@ const message = errore.matchError(error, {
   ValidationError: e => `Invalid ${e.field}`,
   NetworkError: e => `Failed to fetch ${e.url}`
 })
+console.log(message)  // side effects outside callbacks
 
 // Handle plain Error with _ (underscore) handler
 const msg = errore.matchError(err, {
