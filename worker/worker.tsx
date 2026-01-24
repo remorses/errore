@@ -142,28 +142,22 @@ const styles = css`
   }
 
   pre[class*='language-'] {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: center;
-    padding: 2.5rem 1.5rem;
-    margin: 1.5rem 0 2rem;
+    grid-column: 2 / -1;
+    padding: 0.4rem 0;
+    margin: 0.5rem 0 1rem;
     overflow: visible;
     background: none;
     border: none;
     box-shadow: none;
   }
 
-  pre[class*='language-'] code {
-    text-align: left;
-  }
-
   :not(pre) > code {
     font-family: var(--font-mono);
-    font-size: 0.875em;
+    font-size: 0.8em;
     font-weight: 500;
     background: rgba(0, 0, 0, 0.04);
-    padding: 0.2em 0.45em;
-    border-radius: 5px;
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
     color: var(--color-text);
   }
 
@@ -223,9 +217,13 @@ const styles = css`
     color: #e07c46;
   }
 
-  ul {
+  ul, ol {
     padding: 0;
     margin: 0 0 1.5rem 1.5rem;
+  }
+
+  ol {
+    list-style: decimal;
   }
 
   li {
@@ -233,7 +231,7 @@ const styles = css`
     font-size: 1.2rem;
     font-weight: 400;
     line-height: 1.5;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 
   li strong {
@@ -271,8 +269,10 @@ const styles = css`
   }
 
   footer pre[class*='language-'] {
-    padding: 1.5rem 1rem;
-    margin: 0 0 1.5rem;
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem 0;
+    margin: 0 0 1rem;
   }
 
   footer a {
@@ -299,7 +299,8 @@ const styles = css`
     }
 
     pre[class*='language-'] {
-      padding: 2rem 1rem;
+      grid-column: 2;
+      padding: 0.3rem 0;
       font-size: 0.8rem;
     }
 
@@ -310,22 +311,183 @@ const styles = css`
   }
 `
 
-const codeExample1 = `// This function lies. It says it returns a User.
-// But it might throw. You'd never know from the types.
-async function getUser(id: string): Promise<User> {
-  const response = await fetch(\`/api/users/\${id}\`);
-  if (!response.ok) throw new Error('User not found');
-  return response.json();
+// The hook - instant understanding
+const codeHook = `const user = await getUser(id)
+if (user instanceof Error) return user
+console.log(user.name)`
+
+// Why this works
+const codeWhyItWorks = `// The return type tells the truth
+async function getUser(id: string): Promise<NotFoundError | User> {
+  const user = await db.find(id)
+  if (!user) return new NotFoundError({ id })
+  return user
 }`
 
-const codeExample2 = `import { err, ok, Result } from 'errore';
+// Compile error example
+const codeCompileError = `const user = await getUser(id)
+console.log(user.name)
+//                ~~~~
+// Error: Property 'name' does not exist on type 'NotFoundError'`
 
-// This function tells the truth. It returns User or an error.
-async function getUser(id: string): Promise<Result<User, NotFoundError>> {
-  const response = await fetch(\`/api/users/\${id}\`);
-  if (!response.ok) return err(new NotFoundError(id));
-  return ok(await response.json());
+// Expression vs block
+const codeExpressionVsBlock = `// With errore: error handling is an expression
+const config = parseConfig(input)
+if (config instanceof Error) return config
+const db = connectDB(config.dbUrl)
+if (db instanceof Error) return db
+
+// BAD: with try-catch, error handling is a block
+let config: Config
+let db: Database
+try {
+  config = parseConfig(input)
+  db = connectDB(config.dbUrl)
+} catch (e) {
+  ...
 }`
+
+// Go comparison
+const codeGoComparison = `// Go: you can forget to check err
+user, err := fetchUser(id)
+fmt.Println(user.Name)  // Compiles fine. Crashes at runtime.
+
+// TypeScript + errore: you cannot forget
+const user = await fetchUser(id)
+console.log(user.name)  // Won't compile until you handle the error.`
+
+// Null handling
+const codeNullHandling = `// Errors and nulls work together naturally
+function findUser(id: string): NotFoundError | User | null {
+  if (id === 'invalid') return new NotFoundError({ id })
+  if (id === 'missing') return null
+  return { id, name: 'Alice' }
+}
+
+const user = findUser(id)
+if (user instanceof Error) return user
+const name = user?.name ?? 'Guest'`
+
+// Tagged errors
+const codeTaggedErrors = `class NotFoundError extends errore.createTaggedError({
+  name: 'NotFoundError',
+  message: 'User $id not found'
+}) {}
+
+class NetworkError extends errore.createTaggedError({
+  name: 'NetworkError', 
+  message: 'Request to $url failed'
+}) {}
+
+const err = new NotFoundError({ id: '123' })
+err.message  // "User 123 not found"
+err.id       // "123"`
+
+// Pattern matching
+const codePatternMatch = `// Exhaustive matching - compiler errors if you miss a case
+const message = errore.matchError(error, {
+  NotFoundError: e => \`User \${e.id} not found\`,
+  NetworkError: e => \`Failed to reach \${e.url}\`,
+  Error: e => \`Unexpected: \${e.message}\`
+})
+
+// Forgot NotFoundError? TypeScript complains:
+errore.matchError(error, {
+  NetworkError: e => \`...\`,
+  Error: e => \`...\`
+})
+// TS Error: Property 'NotFoundError' is missing in type '{ NetworkError: ...; Error: ...; }'`
+
+// instanceof checking
+const codeInstanceofExhaustive = `async function getUser(id: string): Promise<NotFoundError | NetworkError | ValidationError | User>
+
+const user = await getUser(id)
+if (user instanceof NotFoundError) return 'not found'
+if (user instanceof NetworkError) return 'network issue'
+// Forgot ValidationError? TypeScript knows:
+return user.name
+//     ~~~~
+// TS Error: Property 'name' does not exist on type 'ValidationError'`
+
+// Migration: try-catch
+const codeMigrationBefore = `try {
+  const user = await getUser(id)
+  const posts = await getPosts(user.id)
+  const enriched = await enrichPosts(posts)
+  return enriched
+} catch (e) {
+  if (e instanceof NotFoundError) { console.warn('User not found', id); return null }
+  if (e instanceof NetworkError) { console.error('Network failed', e.url); return null }
+  if (e instanceof RateLimitError) { console.warn('Rate limited'); return null }
+  throw e  // unknown error, hope someone catches it
+}`
+
+const codeMigrationAfter = `const user = await getUser(id)
+if (user instanceof NotFoundError) { console.warn('User not found', id); return null }
+if (user instanceof NetworkError) { console.error('Network failed', user.url); return null }
+
+const posts = await getPosts(user.id)
+if (posts instanceof NetworkError) { console.error('Network failed', posts.url); return null }
+if (posts instanceof RateLimitError) { console.warn('Rate limited'); return null }
+
+const enriched = await enrichPosts(posts)
+if (enriched instanceof Error) { console.error('Processing failed', enriched); return null }
+
+return enriched`
+
+// Migration: parallel operations
+const codeMigrationParallelBefore = `try {
+  const [user, posts, stats] = await Promise.all([
+    getUser(id),
+    getPosts(id),
+    getStats(id)
+  ])
+  return { user, posts, stats }
+} catch (e) {
+  // Which one failed? No idea.
+  console.error('Something failed', e)
+  return null
+}`
+
+const codeMigrationParallelAfter = `const [user, posts, stats] = await Promise.all([
+  getUser(id),
+  getPosts(id),
+  getStats(id)
+])
+
+if (user instanceof Error) { console.error('User fetch failed', user); return null }
+if (posts instanceof Error) { console.error('Posts fetch failed', posts); return null }
+if (stats instanceof Error) { console.error('Stats fetch failed', stats); return null }
+
+return { user, posts, stats }`
+
+// Migration: wrapping external libs
+const codeMigrationWrapBefore = `function parseConfig(input: string): Config {
+  return JSON.parse(input)  // throws on invalid JSON
+}`
+
+const codeMigrationWrapAfter = `function parseConfig(input: string): ParseError | Config {
+  const result = errore.try(() => JSON.parse(input))
+  if (result instanceof Error) return new ParseError({ reason: result.message })
+  return result
+}`
+
+// Migration: validation
+const codeMigrationValidateBefore = `function createUser(input: unknown): User {
+  if (!input.email) throw new Error('Email required')
+  if (!input.name) throw new Error('Name required')
+  return { email: input.email, name: input.name }
+}`
+
+const codeMigrationValidateAfter = `function createUser(input: unknown): ValidationError | User {
+  if (!input.email) return new ValidationError({ field: 'email', reason: 'required' })
+  if (!input.name) return new ValidationError({ field: 'name', reason: 'required' })
+  return { email: input.email, name: input.name }
+}`
+
+
+
+
 
 function Page() {
   return html`
@@ -351,36 +513,74 @@ function Page() {
         <main>
           <span class="tag">Manifesto</span>
           <h1>Errors as Values in TypeScript</h1>
-          <p class="subtitle">A different way to handle errors in TypeScript</p>
+          <p class="subtitle">No wrappers. No exceptions. Just unions.</p>
 
-          <p><span class="intro-letter">E</span>xceptions are a lie we tell ourselves. We pretend our code won't fail, wrapping everything in try-catch blocks as an afterthought, hoping for the best. But errors are not exceptional—they are inevitable, predictable, and deserve to be treated as first-class citizens in our type system.</p>
+          <p><span class="intro-letter">T</span>his is the entire pattern:</p>
 
-          <p>Errore is a TypeScript library that brings the elegance of Go's error handling to the JavaScript ecosystem. Instead of throwing exceptions into the void, we return them. Instead of hoping someone catches our errors, we make them impossible to ignore.</p>
+          <pre class="language-typescript"><code class="language-typescript">${codeHook}</code></pre>
 
-          <h2>The Problem with Exceptions</h2>
+          <p>Functions return errors in their type signature. Callers check with <code>instanceof Error</code>. TypeScript narrows the type automatically. That's it.</p>
 
-          <p>Traditional exception handling creates invisible control flow. When you call a function, you have no idea if it might throw. The type signature lies to you—it promises a return value but might deliver an explosion instead.</p>
+          <pre class="language-typescript"><code class="language-typescript">${codeWhyItWorks}</code></pre>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeExample1}</code></pre>
+          <p><strong>If you forget to handle the error, your code won't compile:</strong></p>
 
-          <p>Every function that might throw creates a hidden dependency. Every caller must know, somehow, that this innocent-looking function could blow up their entire call stack.</p>
+          <pre class="language-typescript"><code class="language-typescript">${codeCompileError}</code></pre>
 
-          <h2>The Solution: Errors as Values</h2>
+          <p>This gives you:</p>
 
-          <p>With errore, errors become visible. They're part of the function signature. They're impossible to accidentally ignore.</p>
+          <ol>
+            <li><strong>Compile-time safety.</strong> Unhandled errors are caught by TypeScript, not by your users in production.</li>
+            <li><strong>Self-documenting signatures.</strong> The return type shows exactly what can go wrong. No need to read the implementation or hope for documentation.</li>
+            <li><strong>Error handling as expressions.</strong> No more <code>let x; try { x = fn() } catch...</code>. Fewer variables, less nesting, errors handled where they occur.</li>
+            <li><strong>Trackable error flow.</strong> Create custom error classes. Trace them through your codebase. Like Effect, but without the learning curve.</li>
+          </ol>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeExample2}</code></pre>
+          <p><strong>Expressions instead of blocks.</strong> Error handling stays linear:</p>
 
-          <p>Now the caller knows exactly what they're dealing with. The type system enforces that they handle both success and failure cases.</p>
+          <pre class="language-typescript"><code class="language-typescript">${codeExpressionVsBlock}</code></pre>
 
-          <h2>Why This Matters</h2>
+          <p><strong>Better than Go.</strong> This is Go-style error handling—errors as values, not exceptions. But with one key difference: Go's two return values let you ignore the error and use the value anyway. A single union makes that impossible:</p>
 
-          <ul>
-            <li><strong>Type safety</strong> — Errors are part of the type signature, not hidden surprises</li>
-            <li><strong>Explicit handling</strong> — You must acknowledge errors; you cannot accidentally ignore them</li>
-            <li><strong>Composability</strong> — Chain operations cleanly with map, flatMap, and other combinators</li>
-            <li><strong>Predictability</strong> — No more wondering "does this throw?" The types tell you everything</li>
-          </ul>
+          <pre class="language-typescript"><code class="language-typescript">${codeGoComparison}</code></pre>
+
+          <p><strong>Errors and nulls together.</strong> Use <code>?.</code> and <code>??</code> naturally:</p>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeNullHandling}</code></pre>
+
+          <h2>Tagged Errors</h2>
+
+          <p>For more structure, create typed errors with <code>$variable</code> interpolation:</p>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeTaggedErrors}</code></pre>
+
+          <p><strong>Pattern match with <code>matchError</code>.</strong> It's exhaustive—the compiler errors if you forget to handle a case:</p>
+
+          <pre class="language-typescript"><code class="language-typescript">${codePatternMatch}</code></pre>
+
+          <p><strong>Same with <code>instanceof</code>.</strong> TypeScript tracks which errors you've handled. Forget one, and it won't compile:</p>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeInstanceofExhaustive}</code></pre>
+
+          <p>This guarantees every error flow is handled. No silent failures. No forgotten edge cases.</p>
+
+          <h2>Migration</h2>
+
+          <p><strong>try-catch with multiple error types:</strong></p>
+          <pre class="language-typescript"><code class="language-typescript">${codeMigrationBefore}</code></pre>
+          <pre class="language-typescript"><code class="language-typescript">${codeMigrationAfter}</code></pre>
+
+          <p><strong>Parallel operations with Promise.all:</strong></p>
+          <pre class="language-typescript"><code class="language-typescript">${codeMigrationParallelBefore}</code></pre>
+          <pre class="language-typescript"><code class="language-typescript">${codeMigrationParallelAfter}</code></pre>
+
+          <p><strong>Wrapping libraries that throw:</strong></p>
+          <pre class="language-typescript"><code class="language-typescript">${codeMigrationWrapBefore}</code></pre>
+          <pre class="language-typescript"><code class="language-typescript">${codeMigrationWrapAfter}</code></pre>
+
+          <p><strong>Validation:</strong></p>
+          <pre class="language-typescript"><code class="language-typescript">${codeMigrationValidateBefore}</code></pre>
+          <pre class="language-typescript"><code class="language-typescript">${codeMigrationValidateAfter}</code></pre>
         </main>
 
         <footer>

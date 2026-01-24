@@ -187,7 +187,7 @@ import * as errore from 'errore'
 
 // Sync: JSON parsing
 function parseJson(input: string): ValidationError | unknown {
-  const result = errore.tryFn({
+  const result = errore.try({
     try: () => JSON.parse(input),
     catch: () => new ValidationError({ field: 'json', reason: 'Invalid JSON' })
   })
@@ -341,7 +341,7 @@ try {
 import * as errore from 'errore'
 
 const config = errore.unwrapOr(
-  errore.tryFn(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
+  errore.try(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
   { port: 3000, debug: false }
 )
 ```
