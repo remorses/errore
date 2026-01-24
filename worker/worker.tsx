@@ -515,7 +515,7 @@ function Page() {
           <h1>Errors as Values in TypeScript</h1>
           <p class="subtitle">No wrappers. No exceptions. Just unions.</p>
 
-          <p><span class="intro-letter">T</span>his is the entire pattern:</p>
+          <p><span class="intro-letter">E</span>rrors are not exceptional—they are inevitable. Instead of throwing exceptions and hoping someone catches them, return errors as values. Make them part of the type signature. Let the compiler enforce that every error is handled.</p>
 
           <pre class="language-typescript"><code class="language-typescript">${codeHook}</code></pre>
 
