@@ -1,0 +1,15 @@
+{
+  "name": "errore-manifesto",
+  "main": "worker/index.ts",
+  "compatibility_date": "2024-01-01",
+  "routes": [
+    {
+      "pattern": "errore.org",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.errore.org",
+      "custom_domain": true
+    }
+  ]
+}
