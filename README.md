@@ -368,6 +368,68 @@ With errore:
 - No unwrapping ceremony
 - TypeScript infers everything
 
+## Why This Is Better Than Go
+
+Go's error handling uses two separate return values:
+
+```go
+user, err := fetchUser(id)
+// Oops! Forgot to check err
+fmt.Println(user.Name)  // Compiles fine, crashes at runtime
+```
+
+The compiler can't save you here. You can ignore `err` entirely and use `user` directly.
+
+With errore, **forgetting to check is impossible**:
+
+```ts
+const user = await fetchUser(id)  // type: NotFoundError | User
+
+console.log(user.name)  // TS Error: Property 'name' does not exist on type 'NotFoundError'
+```
+
+Since errore uses a **single union variable** instead of two separate values, TypeScript forces you to narrow the type before accessing any properties. You literally cannot use the value without first doing an `instanceof Error` check.
+
+### The Remaining Gap
+
+There's still one case errore can't catch: when you call a function but ignore the result entirely:
+
+```ts
+// Oops! Completely ignoring the return value
+updateUser(id, data)  // No error, but we should check!
+```
+
+For this, use **TypeScript's built-in checks** or a linter:
+
+**TypeScript `tsconfig.json`:**
+```json
+{
+  "compilerOptions": {
+    "noUnusedLocals": true
+  }
+}
+```
+
+This catches unused variables, though not ignored return values directly.
+
+**oxlint `no-unused-expressions`:**
+
+`oxlint.json`:
+```json
+{
+  "rules": {
+    "no-unused-expressions": "error"
+  }
+}
+```
+
+Or via CLI:
+```bash
+oxlint --deny no-unused-expressions
+```
+
+Combined with errore's type safety, these tools give you near-complete protection against ignored errors.
+
 ## Comparison with Result Types
 
 | Result Pattern | errore |
