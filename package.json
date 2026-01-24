@@ -41,6 +41,7 @@
   "author": "remorses",
   "license": "MIT",
   "devDependencies": {
+    "hono": "^4.11.5",
     "typescript": "^5.0.0",
     "vitest": "^3.2.4"
   }

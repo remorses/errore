@@ -1,6 +1,6 @@
 {
   "name": "errore-manifesto",
-  "main": "worker/index.ts",
+  "main": "worker/worker.tsx",
   "compatibility_date": "2024-01-01",
   "routes": [
     {
