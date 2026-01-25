@@ -485,6 +485,91 @@ const codeMigrationValidateAfter = `function createUser(input: unknown): Validat
   return { email: input.email, name: input.name }
 }`
 
+// Why not neverthrow / better-result
+const codeNeverthrow = `// neverthrow / better-result
+import { ok, err, Result } from 'neverthrow'
+
+function getUser(id: string): Result<User, NotFoundError> {
+  const user = db.find(id)
+  if (!user) return err(new NotFoundError({ id }))
+  return ok(user)  // must wrap
+}
+
+const result = getUser('123')
+if (result.isErr()) {
+  console.log(result.error)  // must unwrap
+  return
+}
+console.log(result.value.name)  // must unwrap`
+
+const codeNeverthrowErrore = `// errore
+function getUser(id: string): User | NotFoundError {
+  const user = db.find(id)
+  if (!user) return new NotFoundError({ id })
+  return user  // just return
+}
+
+const user = getUser('123')
+if (user instanceof Error) {
+  console.log(user)  // it's already the error
+  return
+}
+console.log(user.name)  // it's already the user`
+
+// Zero dependency example
+const codeZeroDep = `// You can write this without installing errore at all
+class NotFoundError extends Error {
+  readonly _tag = 'NotFoundError'
+  constructor(public id: string) {
+    super(\`User \${id} not found\`)
+  }
+}
+
+async function getUser(id: string): Promise<User | NotFoundError> {
+  const user = await db.find(id)
+  if (!user) return new NotFoundError(id)
+  return user
+}
+
+const user = await getUser('123')
+if (user instanceof Error) return user
+console.log(user.name)`
+
+// Effect comparison
+const codeEffect = `// Effect.ts - a paradigm shift
+import { Effect, pipe } from 'effect'
+
+const program = pipe(
+  fetchUser(id),
+  Effect.flatMap(user => fetchPosts(user.id)),
+  Effect.map(posts => posts.filter(p => p.published)),
+  Effect.catchTag('NotFoundError', () => Effect.succeed([]))
+)
+
+const result = await Effect.runPromise(program)`
+
+const codeEffectErrore = `// errore - regular TypeScript
+const user = await fetchUser(id)
+if (user instanceof Error) return []
+
+const posts = await fetchPosts(user.id)
+if (posts instanceof Error) return []
+
+return posts.filter(p => p.published)`
+
+// Perfect for libraries
+const codeLibraryBad = `// ❌ Library that forces a dependency
+import { Result } from 'some-result-lib'
+export function parse(input: string): Result<AST, ParseError>
+
+// Users must install and learn 'some-result-lib'`
+
+const codeLibraryGood = `// ✓ Library using plain TypeScript unions
+export function parse(input: string): AST | ParseError
+
+// Users handle errors with standard instanceof
+// No new dependencies, no new concepts`
+
 
 
 
@@ -581,6 +666,46 @@ function Page() {
           <p><strong>Validation:</strong></p>
           <pre class="language-typescript"><code class="language-typescript">${codeMigrationValidateBefore}</code></pre>
           <pre class="language-typescript"><code class="language-typescript">${codeMigrationValidateAfter}</code></pre>
+
+          <h2>Vs neverthrow / better-result</h2>
+
+          <p>These libraries wrap values in a <code>Result&lt;T, E&gt;</code> container. You construct with <code>ok()</code> and <code>err()</code>, then unwrap with <code>.value</code> and <code>.error</code>:</p>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeNeverthrow}</code></pre>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeNeverthrowErrore}</code></pre>
+
+          <p><strong>The key insight:</strong> <code>T | Error</code> already encodes success/failure. TypeScript's type narrowing does the rest. No wrapper needed.</p>
+
+          <p>neverthrow requires an <a href="https://github.com/mdbetancourt/eslint-plugin-neverthrow">eslint plugin</a> to catch unhandled results. With errore, TypeScript itself prevents using a value without checking the error first.</p>
+
+          <h2>Vs Effect.ts</h2>
+
+          <p>Effect is not just error handling—it's a complete functional programming framework with dependency injection, concurrency, resource management, and more:</p>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeEffect}</code></pre>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeEffectErrore}</code></pre>
+
+          <p><strong>Use Effect</strong> when you want DI, structured concurrency, and the full FP experience. <strong>Use errore</strong> when you just want type-safe errors without rewriting your codebase.</p>
+
+          <h2>Zero-Dependency Philosophy</h2>
+
+          <p>errore is more a <strong>way of writing code</strong> than a library. The core pattern requires nothing:</p>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeZeroDep}</code></pre>
+
+          <p>The <code>errore</code> package provides conveniences: <code>createTaggedError</code> for less boilerplate, <code>matchError</code> for exhaustive matching, <code>tryAsync</code> for catching exceptions. But the pattern—<strong>errors as union types</strong>—works with zero dependencies.</p>
+
+          <h3>Perfect for Libraries</h3>
+
+          <p>This approach is ideal for library authors. Instead of forcing users to adopt your error handling framework:</p>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeLibraryBad}</code></pre>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeLibraryGood}</code></pre>
+
+          <p>Your library stays lightweight. Users get type-safe errors without adopting an opinionated wrapper.</p>
         </main>
 
         <footer>

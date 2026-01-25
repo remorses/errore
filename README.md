@@ -441,6 +441,147 @@ Combined with errore's type safety, these tools give you near-complete protectio
 | `Result<User, Error>` | `Error \| User` |
 | `Result<Option<T>, E>` | `Error \| T \| null` |
 
+## Vs neverthrow / better-result
+
+These libraries wrap values in a `Result<T, E>` container type. You construct results with `ok()` and `err()`, then unwrap them with `.value` and `.error`:
+
+```ts
+// neverthrow
+import { ok, err, Result } from 'neverthrow'
+
+function getUser(id: string): Result<User, NotFoundError> {
+  const user = db.find(id)
+  if (!user) return err(new NotFoundError({ id }))
+  return ok(user)  // must wrap
+}
+
+const result = getUser('123')
+if (result.isErr()) {
+  console.log(result.error)  // must unwrap
+  return
+}
+console.log(result.value.name)  // must unwrap
+```
+
+```ts
+// errore
+function getUser(id: string): User | NotFoundError {
+  const user = db.find(id)
+  if (!user) return new NotFoundError({ id })
+  return user  // just return
+}
+
+const user = getUser('123')
+if (user instanceof Error) {
+  console.log(user)  // it's already the error
+  return
+}
+console.log(user.name)  // it's already the user
+```
+
+**The key insight**: `T | Error` already encodes success/failure. TypeScript's type narrowing does the rest. No wrapper needed.
+
+| Feature | neverthrow | errore |
+|---------|------------|--------|
+| Type-safe errors | ✓ | ✓ |
+| Exhaustive handling | ✓ | ✓ |
+| Works with null | `Result<T \| null, E>` | `T \| E \| null` |
+| Learning curve | New API (`ok`, `err`, `map`, `andThen`, ...) | Just `instanceof` |
+| Bundle size | ~3KB min | **~0 bytes** |
+| Interop | Requires wrapping/unwrapping at boundaries | Native TypeScript |
+
+neverthrow also requires an [eslint plugin](https://github.com/mdbetancourt/eslint-plugin-neverthrow) to catch unhandled results. With errore, TypeScript itself prevents you from using a value without checking the error first.
+
+## Vs Effect.ts
+
+Effect is not just error handling—it's a complete functional programming framework with dependency injection, concurrency primitives, resource management, streaming, and more.
+
+```ts
+// Effect.ts - a paradigm shift
+import { Effect, pipe } from 'effect'
+
+const program = pipe(
+  fetchUser(id),
+  Effect.flatMap(user => fetchPosts(user.id)),
+  Effect.map(posts => posts.filter(p => p.published)),
+  Effect.catchTag('NotFoundError', () => Effect.succeed([]))
+)
+
+const result = await Effect.runPromise(program)
+```
+
+```ts
+// errore - regular TypeScript
+const user = await fetchUser(id)
+if (user instanceof Error) return []
+
+const posts = await fetchPosts(user.id)
+if (posts instanceof Error) return []
+
+return posts.filter(p => p.published)
+```
+
+Effect is powerful if you need its full feature set. But if you just want type-safe errors:
+
+| | Effect | errore |
+|-|--------|--------|
+| Learning curve | Steep (new paradigm) | Minimal (just `instanceof`) |
+| Codebase impact | Pervasive (everything becomes an Effect) | Surgical (adopt incrementally) |
+| Bundle size | ~50KB+ | **~0 bytes** |
+| Use case | Full FP framework | Just error handling |
+
+**Use Effect** when you want dependency injection, structured concurrency, and the full functional programming experience.
+
+**Use errore** when you just want type-safe errors without rewriting your codebase.
+
+## Zero-Dependency Philosophy
+
+errore is more a **way of writing code** than a library. The core pattern requires nothing:
+
+```ts
+// You can write this without installing errore at all
+class NotFoundError extends Error {
+  readonly _tag = 'NotFoundError'
+  constructor(public id: string) {
+    super(`User ${id} not found`)
+  }
+}
+
+async function getUser(id: string): Promise<User | NotFoundError> {
+  const user = await db.find(id)
+  if (!user) return new NotFoundError(id)
+  return user
+}
+
+const user = await getUser('123')
+if (user instanceof Error) return user
+console.log(user.name)
+```
+
+The `errore` package just provides conveniences: `createTaggedError` for less boilerplate, `matchError` for exhaustive pattern matching, `tryAsync` for catching exceptions. But the core pattern—**errors as union types**—works with zero dependencies.
+
+### Perfect for Libraries
+
+This approach is ideal for library authors. Instead of forcing users to adopt your error handling framework:
+
+```ts
+// ❌ Library that forces a dependency on users
+import { Result } from 'some-result-lib'
+export function parse(input: string): Result<AST, ParseError>
+
+// Users must now install and learn 'some-result-lib'
+```
+
+```ts
+// ✓ Library using plain TypeScript unions
+export function parse(input: string): AST | ParseError
+
+// Users handle errors with standard instanceof checks
+// No new dependencies, no new concepts to learn
+```
+
+Your library stays lightweight. Users get type-safe errors without adopting an opinionated wrapper. Everyone wins.
+
 ## Import Style
 
 > **Note:** Always use `import * as errore from 'errore'` instead of named imports. This makes code easier to move between files, and more readable for people unfamiliar with errore since every function call is clearly namespaced (e.g. `errore.isOk()` instead of just `isOk()`).
