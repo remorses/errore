@@ -587,6 +587,13 @@ function Page() {
         <meta property="og:description" content="A manifesto for type-safe error handling in TypeScript. Errors as values, not exceptions." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://errore.org" />
+        <meta property="og:image" content="https://raw.githubusercontent.com/remorses/errore/main/og-image.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Errore - Errors as Values" />
+        <meta name="twitter:description" content="A manifesto for type-safe error handling in TypeScript. Errors as values, not exceptions." />
+        <meta name="twitter:image" content="https://raw.githubusercontent.com/remorses/errore/main/og-image.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,500&family=Lato:wght@400;700;900&display=swap" rel="stylesheet" />
