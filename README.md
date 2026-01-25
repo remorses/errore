@@ -395,10 +395,12 @@ With errore, **forgetting to check is impossible**:
 ```ts
 const user = await fetchUser(id)  // type: NotFoundError | User
 
-console.log(user.name)  // TS Error: Property 'name' does not exist on type 'NotFoundError'
+console.log(user.id)  // TS Error: Property 'id' does not exist on type 'NotFoundError'
 ```
 
-Since errore uses a **single union variable** instead of two separate values, TypeScript forces you to narrow the type before accessing any properties. You literally cannot use the value without first doing an `instanceof Error` check.
+Since errore uses a **single union variable** instead of two separate values, TypeScript forces you to narrow the type before accessing value-specific properties. You literally cannot use the value without first doing an `instanceof Error` check.
+
+> **Note:** Properties that exist on both `Error` and your value type (like `name`, `message`) can still be accessed without narrowing. This is a small set of 4 fields: `name`, `message`, `stack`, `cause`.
 
 ### The Remaining Gap
 

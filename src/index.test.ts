@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest'
 import {
+  isError,
   isOk,
   tryFn,
   tryAsync,
@@ -800,12 +801,129 @@ describe('TaggedError with custom base class', () => {
 // createTaggedError Factory API
 // ============================================================================
 
+// ============================================================================
+// Edge case: A | Error union is lossy when A = unknown
+// When A is `unknown`, the union `unknown | Error` collapses to just `unknown`
+// because `unknown` is the top type that already includes Error.
+// This means type narrowing breaks down completely.
+// ============================================================================
+
+describe('unknown value type (lossy union)', () => {
+  // This simulates a common pattern: wrapping JSON.parse or similar
+  // functions that return `unknown`
+  function parseJSON(input: string): Error | unknown {
+    try {
+      return JSON.parse(input)
+    } catch (e) {
+      return e instanceof Error ? e : new Error(String(e))
+    }
+  }
+
+  test('demonstrates the lossy union problem', () => {
+    const result = parseJSON('{"a": 1}')
+
+    // Runtime check works
+    expect(result instanceof Error).toBe(false)
+
+    // But the type system doesn't help us!
+    // After this check, `result` should narrow to `unknown` minus Error,
+    // but `Exclude<unknown, Error>` is still `unknown`
+    if (isOk(result)) {
+      // TypeScript thinks result is: Exclude<Error | unknown, Error>
+      // which equals: unknown (not helpful at all!)
+
+      // THE BIG SURPRISE: Even after narrowing, we can't access any properties
+      // because the narrowed type is still `unknown`
+      // @ts-expect-error - result.a is an error because result is unknown, not because it might be Error
+      const _a = result.a
+
+      // We can't even call methods that Error has, proving Error was "absorbed"
+      // @ts-expect-error - unknown doesn't have .message
+      const _msg = result.message
+
+      // The only thing we can do is cast or use runtime checks
+      const value = result as { a: number }
+      expect(value.a).toBe(1)
+    }
+  })
+
+  test('isError also fails to narrow with unknown - THE BIG SURPRISE', () => {
+    const result = parseJSON('invalid json')
+
+    // Runtime: this is an Error
+    expect(result instanceof Error).toBe(true)
+
+    // Using the library's isError function
+    if (isError(result)) {
+      // THE BIG SURPRISE: Even isError doesn't narrow to Error!
+      // Because Extract<unknown, Error> = unknown
+
+      // This SHOULD work if narrowing worked (result should be Error)
+      // But result is still `unknown` so this is a type error
+      // @ts-expect-error - result is unknown, not Error
+      const _message = result.message
+    }
+
+    // WORKAROUND: Use native instanceof instead
+    if (result instanceof Error) {
+      // TypeScript correctly narrows to Error here using native instanceof
+      expect(result.message).toContain('JSON')
+    }
+  })
+
+  test('Extract and Exclude behave unexpectedly with unknown', () => {
+    // These type-level tests show the problem:
+    // Extract<unknown, Error> = unknown (not Error!)
+    // Exclude<unknown, Error> = unknown (not never!)
+
+    // This is because `unknown` is a top type that conditionally
+    // distributes in a special way
+
+    type TestExtract = Extract<Error | unknown, Error>
+    type TestExclude = Exclude<Error | unknown, Error>
+
+    // Both of these are `unknown`, making the union completely useless
+    // for type narrowing purposes
+
+    const extractTest: TestExtract = 'anything' // compiles because TestExtract is unknown
+    const excludeTest: TestExclude = new Error() // compiles because TestExclude is unknown
+
+    expect(extractTest).toBe('anything')
+    expect(excludeTest instanceof Error).toBe(true)
+  })
+
+  test('workaround: use explicit types instead of unknown', () => {
+    // The solution is to never use `unknown` as the value type
+    // Instead, use a specific type or a branded type
+
+    interface ParsedJSON {
+      [key: string]: unknown
+    }
+
+    function parseJSONTyped(input: string): Error | ParsedJSON {
+      try {
+        return JSON.parse(input) as ParsedJSON
+      } catch (e) {
+        return e instanceof Error ? e : new Error(String(e))
+      }
+    }
+
+    const result = parseJSONTyped('{"a": 1}')
+
+    if (isOk(result)) {
+      // Now TypeScript correctly narrows to ParsedJSON
+      expect(result.a).toBe(1)
+    }
+  })
+})
+
 describe('createTaggedError factory', () => {
   test('creates error with interpolated message', () => {
     const NotFoundError = createTaggedError({
       name: 'NotFoundError',
       message: 'User $id not found in $database',
     })
+
 
     const err = new NotFoundError({ id: '123', database: 'users' })
 
