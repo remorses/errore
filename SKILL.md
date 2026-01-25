@@ -23,31 +23,27 @@ The type `Error | unknown` **collapses to just `unknown`** because `unknown` is 
 
 ### The Big Surprise
 
-After using type guards, narrowing completely breaks down:
+Even with `instanceof Error`, narrowing breaks down because TypeScript simplifies `Error | unknown` to just `unknown` before you even use it:
 
 ```ts
 const result = parseJSON('{"a": 1}')
 
-if (isOk(result)) {
-  // You expect: result is the parsed value (not Error)
-  // Reality: result is still `unknown`
-  
-  // This is a type error - can't access properties on unknown!
-  console.log(result.a)  // Error: 'result' is of type 'unknown'
-}
-
-if (isError(result)) {
+// Go-style early return
+if (result instanceof Error) {
   // You expect: result is Error
   // Reality: result is still `unknown`
   
-  // This is a type error too!
+  // This is a type error!
   console.log(result.message)  // Error: 'result' is of type 'unknown'
+  return
 }
-```
 
-The type guards use `Extract<V, Error>` and `Exclude<V, Error>`:
-- `Extract<unknown, Error>` = `unknown` (not `Error`!)
-- `Exclude<unknown, Error>` = `unknown` (not `never`!)
+// You expect: result is the parsed value (not Error)
+// Reality: result is still `unknown`
+
+// This is a type error - can't access properties on unknown!
+console.log(result.a)  // Error: 'result' is of type 'unknown'
+```
 
 **You get zero type safety.** The code compiles but TypeScript can't help you at all.
 
@@ -71,10 +67,14 @@ function parseJSON(input: string): Error | ParsedJSON {
 
 const result = parseJSON('{"a": 1}')
 
-if (isOk(result)) {
-  // Now TypeScript correctly narrows to ParsedJSON
-  console.log(result.a)  // Works!
+// Go-style early return
+if (result instanceof Error) {
+  console.log(result.message)  // Works! result is Error
+  return
 }
+
+// Now TypeScript correctly narrows to ParsedJSON
+console.log(result.a)  // Works!
 ```
 
 Or use generic types to preserve the caller's type:
@@ -90,9 +90,11 @@ function parseJSON<T>(input: string): Error | T {
 }
 
 const result = parseJSON<{ a: number }>('{"a": 1}')
-if (isOk(result)) {
-  console.log(result.a)  // Works! result is { a: number }
-}
+
+// Go-style early return
+if (result instanceof Error) return
+
+console.log(result.a)  // Works! result is { a: number }
 ```
 
 ## Never use `CustomError | Error` when CustomError extends Error

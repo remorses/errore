@@ -825,49 +825,48 @@ describe('unknown value type (lossy union)', () => {
     // Runtime check works
     expect(result instanceof Error).toBe(false)
 
-    // But the type system doesn't help us!
-    // After this check, `result` should narrow to `unknown` minus Error,
-    // but `Exclude<unknown, Error>` is still `unknown`
-    if (isOk(result)) {
-      // TypeScript thinks result is: Exclude<Error | unknown, Error>
-      // which equals: unknown (not helpful at all!)
-
-      // THE BIG SURPRISE: Even after narrowing, we can't access any properties
-      // because the narrowed type is still `unknown`
-      // @ts-expect-error - result.a is an error because result is unknown, not because it might be Error
-      const _a = result.a
-
-      // We can't even call methods that Error has, proving Error was "absorbed"
-      // @ts-expect-error - unknown doesn't have .message
+    // Go-style early return - but type system doesn't help!
+    // TypeScript simplifies `Error | unknown` to `unknown` before we even use it
+    if (result instanceof Error) {
+      // THE BIG SURPRISE: Even instanceof Error doesn't narrow properly!
+      // Because the type was already collapsed to `unknown`
+      // @ts-expect-error - result is unknown, not Error
       const _msg = result.message
-
-      // The only thing we can do is cast or use runtime checks
-      const value = result as { a: number }
-      expect(value.a).toBe(1)
+      return
     }
+
+    // After early return, result should be the value (not Error)
+    // But `Exclude<unknown, Error>` is still `unknown`
+
+    // THE BIG SURPRISE: Even after narrowing, we can't access any properties
+    // because the narrowed type is still `unknown`
+    // @ts-expect-error - result.a is an error because result is unknown
+    const _a = result.a
+
+    // The only thing we can do is cast or use runtime checks
+    const value = result as { a: number }
+    expect(value.a).toBe(1)
   })
 
-  test('isError also fails to narrow with unknown - THE BIG SURPRISE', () => {
+  test('instanceof Error also fails to narrow with unknown - THE BIG SURPRISE', () => {
     const result = parseJSON('invalid json')
 
     // Runtime: this is an Error
     expect(result instanceof Error).toBe(true)
 
-    // Using the library's isError function
-    if (isError(result)) {
-      // THE BIG SURPRISE: Even isError doesn't narrow to Error!
-      // Because Extract<unknown, Error> = unknown
+    // Go-style early return with instanceof Error
+    if (result instanceof Error) {
+      // THE BIG SURPRISE: Even instanceof Error doesn't narrow to Error!
+      // Because the type `Error | unknown` was collapsed to just `unknown`
+      // before we even got here
 
-      // This SHOULD work if narrowing worked (result should be Error)
+      // This SHOULD work if the union wasn't collapsed
       // But result is still `unknown` so this is a type error
       // @ts-expect-error - result is unknown, not Error
       const _message = result.message
-    }
 
-    // WORKAROUND: Use native instanceof instead
-    if (result instanceof Error) {
-      // TypeScript correctly narrows to Error here using native instanceof
-      expect(result.message).toContain('JSON')
+      // Runtime still works, just no type safety
+      expect((result as Error).message).toContain('JSON')
     }
   })
 
@@ -910,10 +909,15 @@ describe('unknown value type (lossy union)', () => {
 
     const result = parseJSONTyped('{"a": 1}')
 
-    if (isOk(result)) {
-      // Now TypeScript correctly narrows to ParsedJSON
-      expect(result.a).toBe(1)
+    // Go-style early return
+    if (result instanceof Error) {
+      // Now TypeScript correctly narrows to Error
+      expect(result.message).toBeDefined()
+      return
     }
+
+    // Now TypeScript correctly narrows to ParsedJSON
+    expect(result.a).toBe(1)
   })
 })
 
