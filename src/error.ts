@@ -142,12 +142,6 @@ export const TaggedError: {
  */
 export const isTaggedError = isAnyTaggedError
 
-/**
- * Handler map for exhaustive matching (tagged errors only)
- */
-type MatchHandlers<E extends AnyTaggedError, R> = {
-  [K in E['_tag']]: (err: Extract<E, { _tag: K }>) => R
-}
 
 /**
  * Handler map with required `Error` fallback for plain Error (untagged)
