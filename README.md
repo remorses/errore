@@ -4,7 +4,7 @@ Type-safe errors as values for TypeScript. Like Go, but with full type inference
 
 ## Why?
 
-Instead of wrapping values in a `Result<T, E>` type, functions simply return `E | T`. TypeScript's type narrowing handles the rest:
+Instead of wrapping values in a `Result<T, E>` type, functions simply return `E | T`. TypeScript's **type narrowing** handles the rest:
 
 ```ts
 // Go-style: errors as values
@@ -20,6 +20,8 @@ npm install errore
 ```
 
 ## Quick Start
+
+Define typed errors with **variable interpolation** and return **Error or Value** directly:
 
 ```ts
 import * as errore from 'errore'
@@ -67,7 +69,7 @@ console.log(user.name)
 
 ## Example: API Error Handling
 
-A complete example with custom base class, HTTP status codes, and error reporting:
+A complete example with **custom base class** and HTTP status codes:
 
 ```ts
 import * as errore from 'errore'
@@ -139,7 +141,7 @@ app.post('/users/:id', async (req, res) => {
 
 ### createTaggedError
 
-Create typed errors with `$variable` interpolation in the message:
+Create typed errors with **variable interpolation** in the message:
 
 ```ts
 import * as errore from 'errore'
@@ -188,6 +190,8 @@ err instanceof AppError  // true
 
 ### Type Guards
 
+Use **instanceof checks** to narrow union types:
+
 ```ts
 const result: NetworkError | User = await fetchUser(id)
 
@@ -199,6 +203,8 @@ if (result instanceof Error) {
 ```
 
 ### Try Functions
+
+**Wrap exceptions** as error values:
 
 ```ts
 import * as errore from 'errore'
@@ -224,6 +230,8 @@ const response = await errore.tryAsync({
 
 ### Transformations
 
+**Transform and chain** operations:
+
 ```ts
 import * as errore from 'errore'
 
@@ -241,6 +249,8 @@ const logged = errore.tap(user, u => console.log('Got user:', u.name))
 ```
 
 ### Extraction
+
+**Extract values** or throw, **split arrays** by success/error:
 
 ```ts
 import * as errore from 'errore'
@@ -264,7 +274,7 @@ const [users, errors] = errore.partition(results)
 
 ### Error Matching
 
-Always assign `matchError` results to a variable. Keep callbacks pure (return values only) and move side effects outside:
+**Exhaustive pattern matching** with `matchError`. Always assign results to a variable and keep callbacks pure:
 
 ```ts
 import * as errore from 'errore'
@@ -298,7 +308,7 @@ ValidationError.is(value)  // specific class
 
 ## How Type Safety Works
 
-TypeScript narrows types after `instanceof Error` checks:
+TypeScript **narrows types** after `instanceof Error` checks:
 
 ```ts
 function example(result: NetworkError | User): string {
@@ -318,7 +328,7 @@ This works because:
 
 ## Result + Option Combined: `Error | T | null`
 
-One of errore's best features: you can naturally combine error handling with optional values. No wrapper nesting needed!
+Naturally combine **error handling with optional values**. No wrapper nesting needed!
 
 ```ts
 import * as errore from 'errore'
@@ -362,7 +372,7 @@ console.log(user.name)
 | Zig | `!?T` (error union + optional) | Yes, specific syntax |
 | **errore** | `Error \| T \| null` | **No!** Check in any order |
 
-With errore:
+With errore you **check in any order**:
 - Use `?.` and `??` naturally
 - Check `instanceof Error` or `=== null` in any order
 - No unwrapping ceremony
@@ -370,7 +380,7 @@ With errore:
 
 ## Why This Is Better Than Go
 
-Go's error handling uses two separate return values:
+Go's error handling uses **two separate return values**:
 
 ```go
 user, err := fetchUser(id)
@@ -392,7 +402,7 @@ Since errore uses a **single union variable** instead of two separate values, Ty
 
 ### The Remaining Gap
 
-There's still one case errore can't catch: when you call a function but ignore the result entirely:
+There's still one case errore can't catch: **ignored return values**:
 
 ```ts
 // Oops! Completely ignoring the return value
@@ -432,6 +442,8 @@ Combined with errore's type safety, these tools give you near-complete protectio
 
 ## Comparison with Result Types
 
+**Direct returns** vs wrapper methods:
+
 | Result Pattern | errore |
 |---------------|--------|
 | `Result.ok(value)` | just `return value` |
@@ -443,7 +455,7 @@ Combined with errore's type safety, these tools give you near-complete protectio
 
 ## Vs neverthrow / better-result
 
-These libraries wrap values in a `Result<T, E>` container type. You construct results with `ok()` and `err()`, then unwrap them with `.value` and `.error`:
+These libraries wrap values in a **Result container**. You construct results with `ok()` and `err()`, then unwrap them with `.value` and `.error`:
 
 ```ts
 // neverthrow
@@ -494,7 +506,7 @@ neverthrow also requires an [eslint plugin](https://github.com/mdbetancourt/esli
 
 ## Vs Effect.ts
 
-Effect is not just error handling—it's a complete functional programming framework with dependency injection, concurrency primitives, resource management, streaming, and more.
+Effect is not just error handling—it's a **complete functional programming framework** with dependency injection, concurrency primitives, resource management, streaming, and more.
 
 ```ts
 // Effect.ts - a paradigm shift
@@ -562,7 +574,7 @@ The `errore` package just provides conveniences: `createTaggedError` for less bo
 
 ### Perfect for Libraries
 
-This approach is ideal for library authors. Instead of forcing users to adopt your error handling framework:
+Ideal for library authors. Return **plain TypeScript unions** instead of forcing users to adopt your error handling framework:
 
 ```ts
 // ❌ Library that forces a dependency on users
@@ -584,7 +596,7 @@ Your library stays lightweight. Users get type-safe errors without adopting an o
 
 ## Import Style
 
-> **Note:** Always use `import * as errore from 'errore'` instead of named imports. This makes code easier to move between files, and more readable for people unfamiliar with errore since every function call is clearly namespaced (e.g. `errore.isOk()` instead of just `isOk()`).
+> **Note:** Always use `import * as errore from 'errore'` instead of named imports. This makes code easier to move between files, and more readable since every function call is **clearly namespaced** (e.g. `errore.isOk()` instead of just `isOk()`).
 
 ## License
 
