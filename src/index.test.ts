@@ -825,22 +825,19 @@ describe('unknown value type (lossy union)', () => {
     // Runtime check works
     expect(result instanceof Error).toBe(false)
 
-    // Go-style early return - but type system doesn't help!
+    // Go-style early return
     // TypeScript simplifies `Error | unknown` to `unknown` before we even use it
     if (result instanceof Error) {
-      // THE BIG SURPRISE: Even instanceof Error doesn't narrow properly!
-      // Because the type was already collapsed to `unknown`
-      // @ts-expect-error - result is unknown, not Error
-      const _msg = result.message
+      // GOOD: instanceof Error DOES narrow to Error inside the block
+      const _msg = result.message // This works!
       return
     }
 
-    // After early return, result should be the value (not Error)
-    // But `Exclude<unknown, Error>` is still `unknown`
+    // THE BIG SURPRISE: After early return, result is still `unknown`!
+    // We handled the Error case, but TypeScript can't narrow `unknown` to
+    // "unknown minus Error" - it's still just `unknown`
 
-    // THE BIG SURPRISE: Even after narrowing, we can't access any properties
-    // because the narrowed type is still `unknown`
-    // @ts-expect-error - result.a is an error because result is unknown
+    // @ts-expect-error - result.a is an error because result is still unknown
     const _a = result.a
 
     // The only thing we can do is cast or use runtime checks
@@ -848,7 +845,7 @@ describe('unknown value type (lossy union)', () => {
     expect(value.a).toBe(1)
   })
 
-  test('instanceof Error also fails to narrow with unknown - THE BIG SURPRISE', () => {
+  test('instanceof Error DOES narrow inside the block', () => {
     const result = parseJSON('invalid json')
 
     // Runtime: this is an Error
@@ -856,38 +853,31 @@ describe('unknown value type (lossy union)', () => {
 
     // Go-style early return with instanceof Error
     if (result instanceof Error) {
-      // THE BIG SURPRISE: Even instanceof Error doesn't narrow to Error!
-      // Because the type `Error | unknown` was collapsed to just `unknown`
-      // before we even got here
+      // GOOD NEWS: instanceof Error DOES narrow correctly inside the block!
+      // Even though the type was `unknown`, inside here it's `Error`
+      const _message = result.message // This works!
 
-      // This SHOULD work if the union wasn't collapsed
-      // But result is still `unknown` so this is a type error
-      // @ts-expect-error - result is unknown, not Error
-      const _message = result.message
-
-      // Runtime still works, just no type safety
-      expect((result as Error).message).toContain('JSON')
+      expect(result.message).toContain('JSON')
     }
   })
 
-  test('Extract and Exclude behave unexpectedly with unknown', () => {
-    // These type-level tests show the problem:
-    // Extract<unknown, Error> = unknown (not Error!)
-    // Exclude<unknown, Error> = unknown (not never!)
+  test('Extract and Exclude with unknown', () => {
+    // Error | unknown simplifies to just `unknown`
+    // Then Extract/Exclude operate on `unknown`:
 
-    // This is because `unknown` is a top type that conditionally
-    // distributes in a special way
+    // Extract<unknown, Error> = never (unknown doesn't extend Error)
+    // Exclude<unknown, Error> = unknown (unknown doesn't extend Error, so not excluded)
 
     type TestExtract = Extract<Error | unknown, Error>
     type TestExclude = Exclude<Error | unknown, Error>
 
-    // Both of these are `unknown`, making the union completely useless
-    // for type narrowing purposes
+    // Extract gives `never` - can't assign anything
+    // @ts-expect-error - TestExtract is never, not unknown
+    const _extractTest: TestExtract = 'anything'
 
-    const extractTest: TestExtract = 'anything' // compiles because TestExtract is unknown
+    // Exclude gives `unknown` - can assign anything
     const excludeTest: TestExclude = new Error() // compiles because TestExclude is unknown
 
-    expect(extractTest).toBe('anything')
     expect(excludeTest instanceof Error).toBe(true)
   })
 

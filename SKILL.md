@@ -23,29 +23,26 @@ The type `Error | unknown` **collapses to just `unknown`** because `unknown` is 
 
 ### The Big Surprise
 
-Even with `instanceof Error`, narrowing breaks down because TypeScript simplifies `Error | unknown` to just `unknown` before you even use it:
+TypeScript simplifies `Error | unknown` to just `unknown`. The `instanceof Error` check works inside the block, but **after the early return you still have `unknown`**:
 
 ```ts
 const result = parseJSON('{"a": 1}')
 
 // Go-style early return
 if (result instanceof Error) {
-  // You expect: result is Error
-  // Reality: result is still `unknown`
-  
-  // This is a type error!
-  console.log(result.message)  // Error: 'result' is of type 'unknown'
+  // GOOD: instanceof Error narrows to Error inside the block
+  console.log(result.message)  // Works!
   return
 }
 
-// You expect: result is the parsed value (not Error)
-// Reality: result is still `unknown`
+// THE SURPRISE: After early return, result is still `unknown`!
+// TypeScript can't narrow `unknown` to "unknown minus Error"
 
 // This is a type error - can't access properties on unknown!
 console.log(result.a)  // Error: 'result' is of type 'unknown'
 ```
 
-**You get zero type safety.** The code compiles but TypeScript can't help you at all.
+**You lose type safety on the success path.** Error handling works, but you can't use the value without casting.
 
 ### The Fix
 
