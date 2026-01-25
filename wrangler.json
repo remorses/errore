@@ -2,6 +2,10 @@
   "name": "errore-manifesto",
   "main": "worker/worker.tsx",
   "compatibility_date": "2024-01-01",
+  "assets": {
+    "directory": "public",
+    "binding": "ASSETS"
+  },
   "routes": [
     {
       "pattern": "errore.org",
