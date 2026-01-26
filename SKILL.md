@@ -146,3 +146,56 @@ function getErrorReport(id: string): NotFoundError | ErrorReport {
 |---------|---------|-----|
 | `unknown \| Error` | Union collapses to `unknown`, no narrowing | Use explicit types like `T \| Error` |
 | `CustomError \| Error` where CustomError extends Error | Can't distinguish success from failure | Success types should never extend Error |
+
+## Error Wrapping with `cause`
+
+Use `cause` to wrap errors with additional context while preserving the original:
+
+```ts
+async function processUser(id: string): Promise<ServiceError | ProcessedUser> {
+  const user = await getUser(id)  // returns NotFoundError | User
+  
+  if (user instanceof Error) {
+    // Wrap in ServiceError, preserve original in cause
+    return new ServiceError({ id, cause: user })
+  }
+  
+  return process(user)
+}
+
+// Access original via cause
+const result = await processUser('123')
+if (result instanceof Error) {
+  if (result.cause instanceof NotFoundError) {
+    console.log(result.cause.id)  // original error's properties
+  }
+}
+```
+
+This is equivalent to Go's `fmt.Errorf("context: %w", err)` pattern.
+
+## Custom Base Class with `extends`
+
+Use `extends` to inherit from a custom base class with shared functionality:
+
+```ts
+class AppError extends Error {
+  statusCode = 500
+  toResponse() { return { error: this.message, code: this.statusCode } }
+}
+
+class NotFoundError extends errore.createTaggedError({
+  name: 'NotFoundError',
+  message: 'Resource $id not found',
+  extends: AppError
+}) {
+  statusCode = 404
+}
+
+const err = new NotFoundError({ id: '123' })
+err instanceof NotFoundError  // true
+err instanceof AppError       // true
+err instanceof Error          // true
+```
+
+This is useful for shared error handling logic (e.g., HTTP status codes, logging methods).

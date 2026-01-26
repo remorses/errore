@@ -195,6 +195,85 @@ err.statusCode  // 500 (inherited from AppError)
 err instanceof AppError  // true
 ```
 
+### Error Wrapping and Context
+
+Wrap errors with additional context while **preserving the original error** via `cause`:
+
+```ts
+// Wrap with context, preserve original in cause
+async function processUser(id: string): Promise<ServiceError | ProcessedUser> {
+  const user = await getUser(id)  // returns NotFoundError | User
+  
+  if (user instanceof Error) {
+    return new ServiceError({ id, cause: user })
+  }
+  
+  return process(user)
+}
+
+// Access original error via cause
+const result = await processUser('123')
+if (result instanceof Error) {
+  console.log(result.message)  // "Failed to process user 123"
+  
+  if (result.cause instanceof NotFoundError) {
+    console.log(result.cause.id)  // access original error's properties
+  }
+}
+```
+
+The error definitions:
+
+```ts
+class NotFoundError extends errore.createTaggedError({
+  name: 'NotFoundError',
+  message: 'User $id not found'
+}) {}
+
+class ServiceError extends errore.createTaggedError({
+  name: 'ServiceError',
+  message: 'Failed to process user $id'
+}) {}
+```
+
+**Browser console** prints the full cause chain:
+
+```
+ServiceError: Failed to process user 123
+    at processUser (app.js:12)
+    at main (app.js:20)
+Caused by: NotFoundError: User 123 not found
+    at getUser (app.js:5)
+    at processUser (app.js:8)
+```
+
+### Custom Base Class with `extends`
+
+Use `extends` to inherit from a custom base class. The error will pass `instanceof` for both the base class and the specific error class:
+
+```ts
+class AppError extends Error {
+  statusCode = 500
+  toResponse() { return { error: this.message, code: this.statusCode } }
+}
+
+class NotFoundError extends errore.createTaggedError({
+  name: 'NotFoundError',
+  message: 'Resource $id not found',
+  extends: AppError
+}) {
+  statusCode = 404
+}
+
+const err = new NotFoundError({ id: '123' })
+err instanceof NotFoundError  // true
+err instanceof AppError       // true
+err instanceof Error          // true
+
+err.statusCode    // 404
+err.toResponse()  // { error: 'Resource 123 not found', code: 404 }
+```
+
 ### Type Guards
 
 Use **instanceof checks** to narrow union types:
