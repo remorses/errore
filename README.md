@@ -8,9 +8,10 @@ Instead of wrapping values in a `Result<T, E>` type, functions simply return `E 
 
 ```ts
 // Go-style: errors as values
-const user = await fetchUser(id)
-if (user instanceof Error) return user  // TypeScript narrows type
-console.log(user.name)                  // user is now User, not Error | User
+const user = await getUser(id)
+if (user instanceof NotFoundError) { console.error('Missing:', user.id); return }
+if (user instanceof DbError) { console.error('DB failed:', user.reason); return }
+console.log(user.name)  // user is User, fully narrowed
 ```
 
 ## Install
