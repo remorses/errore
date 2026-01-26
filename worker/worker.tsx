@@ -313,9 +313,15 @@ const styles = css`
 
 // The hook - instant understanding
 const codeHook = `const user = await getUser(id)
-if (user instanceof NotFoundError) { console.error('Missing:', user.id); return }
-if (user instanceof DbError) { console.error('DB failed:', user.reason); return }
-console.log(user.name)  // user is User, fully narrowed`
+if (user instanceof NotFoundError) {
+  console.error('Missing:', user.id)
+  return
+}
+if (user instanceof DbError) {
+  console.error('DB failed:', user.reason)
+  return
+}
+console.log(user.username)  // user is User, fully narrowed`
 
 // Why this works
 const codeWhyItWorks = `// The return type tells the truth

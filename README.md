@@ -9,9 +9,15 @@ Instead of wrapping values in a `Result<T, E>` type, functions simply return `E 
 ```ts
 // Go-style: errors as values
 const user = await getUser(id)
-if (user instanceof NotFoundError) { console.error('Missing:', user.id); return }
-if (user instanceof DbError) { console.error('DB failed:', user.reason); return }
-console.log(user.name)  // user is User, fully narrowed
+if (user instanceof NotFoundError) {
+  console.error('Missing:', user.id)
+  return
+}
+if (user instanceof DbError) {
+  console.error('DB failed:', user.reason)
+  return
+}
+console.log(user.username)  // user is User, fully narrowed
 ```
 
 ## Install
