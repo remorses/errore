@@ -9,6 +9,41 @@ const serializeCause = (cause: unknown): unknown => {
 }
 
 /**
+ * Any class that extends Error (used by findCause)
+ */
+type AnyErrorClass = new (...args: any[]) => Error
+
+/**
+ * Walk the .cause chain of an error to find an ancestor matching a specific error class.
+ * Checks the error itself first, then traverses .cause recursively.
+ * Similar to Go's `errors.As`.
+ *
+ * @example
+ * const notFound = findCause(err, NotFoundError)
+ * if (notFound) {
+ *   console.log(notFound.id) // type-safe access
+ * }
+ *
+ * @example
+ * // With optional chaining
+ * const id = findCause(err, NotFoundError)?.id
+ */
+export function findCause<T extends Error>(
+  error: Error,
+  ErrorClass: new (...args: any[]) => T,
+): T | undefined {
+  const seen = new Set<Error>()
+  let current: unknown = error
+  while (current instanceof Error) {
+    if (seen.has(current)) break
+    seen.add(current)
+    if (current instanceof ErrorClass) return current as T
+    current = current.cause
+  }
+  return undefined
+}
+
+/**
  * Any tagged error (for generic constraints)
  */
 type AnyTaggedError = Error & { readonly _tag: string }
@@ -31,6 +66,8 @@ type ErrorClass = new (...args: any[]) => Error
 export type TaggedErrorInstance<Tag extends string, Props, Base extends Error = Error> = Base & {
   readonly _tag: Tag
   toJSON(): object
+  /** Walk the .cause chain to find an ancestor matching a specific error class. */
+  findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined
 } & Readonly<Props>
 
 /**
@@ -115,6 +152,10 @@ export const TaggedError: {
             const indented = cause.stack.replace(/\n/g, '\n  ')
             this.stack = `${this.stack}\nCaused by: ${indented}`
           }
+        }
+
+        findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined {
+          return findCause(this, ErrorClass)
         }
 
         toJSON(): object {

@@ -1,3 +1,5 @@
+import { findCause } from './error.js'
+
 /**
  * Factory API for creating tagged errors with $variable interpolation in messages.
  *
@@ -82,6 +84,8 @@ export type FactoryTaggedErrorInstance<
   readonly _tag: Tag
   readonly message: string
   toJSON(): object
+  /** Walk the .cause chain to find an ancestor matching a specific error class. */
+  findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined
 } & Readonly<VarProps<Msg>>
 
 /**
@@ -246,6 +250,10 @@ export function createTaggedError<
         const indented = cause.stack.replace(/\n/g, '\n  ')
         this.stack = `${this.stack}\nCaused by: ${indented}`
       }
+    }
+
+    findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined {
+      return findCause(this, ErrorClass)
     }
 
     toJSON(): object {

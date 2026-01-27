@@ -16,6 +16,7 @@ import {
   matchErrorPartial,
   UnhandledError,
   createTaggedError,
+  findCause,
 } from './index.js'
 
 // ============================================================================
@@ -1170,5 +1171,128 @@ describe('createTaggedError factory', () => {
     expect(TestError.is(err)).toBe(true)
     expect(TestError.is(plainErr)).toBe(false)
     expect(TestError.is(customErr)).toBe(false)
+  })
+})
+
+describe('findCause', () => {
+  class RootError extends TaggedError('RootError')<{ id: string; message: string }>() {}
+  class MiddleError extends TaggedError('MiddleError')<{ step: string; message: string; cause: Error }>() {}
+  class TopError extends TaggedError('TopError')<{ message: string; cause: Error }>() {}
+  class UnrelatedError extends TaggedError('UnrelatedError')<{ message: string }>() {}
+
+  const root = new RootError({ id: '123', message: 'not found' })
+  const middle = new MiddleError({ step: 'fetch', message: 'fetch failed', cause: root })
+  const top = new TopError({ message: 'service error', cause: middle })
+
+  test('standalone findCause finds self', () => {
+    const found = findCause(root, RootError)
+    expect(found).toBe(root)
+    expect(found?.id).toBe('123')
+  })
+
+  test('standalone findCause finds direct cause', () => {
+    const found = findCause(middle, RootError)
+    expect(found).toBe(root)
+    expect(found?.id).toBe('123')
+  })
+
+  test('standalone findCause finds deep ancestor (A -> B -> C)', () => {
+    const found = findCause(top, RootError)
+    expect(found).toBe(root)
+    expect(found?.id).toBe('123')
+  })
+
+  test('standalone findCause returns undefined when not found', () => {
+    const found = findCause(top, UnrelatedError)
+    expect(found).toBeUndefined()
+  })
+
+  test('standalone findCause works on plain Error', () => {
+    const inner = new Error('inner')
+    const outer = new Error('outer', { cause: inner })
+    expect(findCause(outer, Error)).toBe(outer)
+  })
+
+  test('instance .findCause() finds self', () => {
+    const found = root.findCause(RootError)
+    expect(found).toBe(root)
+  })
+
+  test('instance .findCause() finds direct cause', () => {
+    const found = middle.findCause(RootError)
+    expect(found).toBe(root)
+    expect(found?.id).toBe('123')
+  })
+
+  test('instance .findCause() finds deep ancestor', () => {
+    const found = top.findCause(RootError)
+    expect(found).toBe(root)
+  })
+
+  test('instance .findCause() finds middle ancestor', () => {
+    const found = top.findCause(MiddleError)
+    expect(found).toBe(middle)
+    expect(found?.step).toBe('fetch')
+  })
+
+  test('instance .findCause() returns undefined when not found', () => {
+    expect(top.findCause(UnrelatedError)).toBeUndefined()
+  })
+
+  test('works with createTaggedError errors', () => {
+    class InnerError extends createTaggedError({
+      name: 'InnerError',
+      message: 'inner $code',
+    }) {}
+    class OuterError extends createTaggedError({
+      name: 'OuterError',
+      message: 'outer failed',
+    }) {}
+
+    const inner = new InnerError({ code: '404' })
+    const outer = new OuterError({ cause: inner })
+
+    // standalone
+    const found = findCause(outer, InnerError)
+    expect(found).toBeInstanceOf(InnerError)
+    expect(found?.code).toBe('404')
+
+    // instance method
+    const found2 = outer.findCause(InnerError)
+    expect(found2).toBeInstanceOf(InnerError)
+    expect(found2?.code).toBe('404')
+  })
+
+  test('works with custom base class', () => {
+    class AppError extends Error {
+      statusCode = 500
+    }
+
+    class DbError extends TaggedError('DbError', AppError)<{ message: string }>() {
+      statusCode = 503
+    }
+    class ApiError extends TaggedError('ApiError', AppError)<{ message: string; cause: Error }>() {
+      statusCode = 502
+    }
+
+    const db = new DbError({ message: 'connection lost' })
+    const api = new ApiError({ message: 'upstream failed', cause: db })
+
+    const found = api.findCause(DbError)
+    expect(found).toBe(db)
+    expect(found?.statusCode).toBe(503)
+
+    // Also findable via base class
+    const foundBase = findCause(api, AppError)
+    expect(foundBase).toBe(api) // self matches first
+  })
+
+  test('handles circular cause gracefully', () => {
+    const a = new Error('a')
+    const b = new Error('b', { cause: a })
+    // Force circular reference
+    ;(a as any).cause = b
+    // Should not infinite loop, should return undefined for unrelated class
+    expect(findCause(b, UnrelatedError)).toBeUndefined()
   })
 })

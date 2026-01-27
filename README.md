@@ -247,6 +247,53 @@ Caused by: NotFoundError: User 123 not found
     at processUser (app.js:8)
 ```
 
+### findCause
+
+Walk the `.cause` chain to find an ancestor matching a specific error class. Similar to Go's `errors.As` — checks the error itself first, then traverses `.cause` recursively:
+
+```ts
+import * as errore from 'errore'
+
+class NotFoundError extends errore.createTaggedError({
+  name: 'NotFoundError',
+  message: 'User $id not found'
+}) {}
+
+class ServiceError extends errore.createTaggedError({
+  name: 'ServiceError',
+  message: 'Failed to process user $id'
+}) {}
+
+// Deep chain: ServiceError -> NotFoundError
+const notFound = new NotFoundError({ id: '123' })
+const service = new ServiceError({ id: '123', cause: notFound })
+
+// Instance method on tagged errors
+const found = service.findCause(NotFoundError)
+found?.id  // '123' — type-safe access
+
+// Standalone function for any Error
+const found2 = errore.findCause(service, NotFoundError)
+found2?.id  // '123'
+```
+
+This solves the problem where `result.cause instanceof MyError` only checks one level deep. `findCause` walks the entire chain:
+
+```ts
+// A -> B -> C chain
+const c = new DbError({ message: 'connection reset' })
+const b = new ServiceError({ id: '123', cause: c })
+const a = new ApiError({ message: 'request failed', cause: b })
+
+// Manual check only finds B
+a.cause instanceof DbError  // false — only checks one level
+
+// findCause walks the full chain
+a.findCause(DbError)  // finds C ✓
+```
+
+Returns `undefined` if no matching ancestor is found. Safe against circular `.cause` references.
+
 ### Custom Base Class with `extends`
 
 Use `extends` to inherit from a custom base class. The error will pass `instanceof` for both the base class and the specific error class:

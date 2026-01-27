@@ -174,6 +174,39 @@ if (result instanceof Error) {
 
 This is equivalent to Go's `fmt.Errorf("context: %w", err)` pattern.
 
+## findCause: Walking the Cause Chain
+
+Checking `result.cause instanceof MyError` only inspects one level deep. For deep chains (A -> B -> C), use `findCause` to walk the entire `.cause` chain. This is equivalent to Go's `errors.As`:
+
+```ts
+import * as errore from 'errore'
+
+class DbError extends errore.createTaggedError({
+  name: 'DbError',
+  message: 'Connection to $host failed'
+}) {}
+
+class ServiceError extends errore.createTaggedError({
+  name: 'ServiceError',
+  message: 'Service $name failed'
+}) {}
+
+const db = new DbError({ host: 'db.example.com' })
+const svc = new ServiceError({ name: 'user-service', cause: db })
+
+// Instance method — available on all tagged errors
+const found = svc.findCause(DbError)
+found?.host  // 'db.example.com' — type-safe access
+
+// Standalone function — works on any Error
+const found2 = errore.findCause(svc, DbError)
+found2?.host  // 'db.example.com'
+```
+
+- Checks the error itself first, then walks `.cause` recursively
+- Returns the matched error with full type inference, or `undefined` if not found
+- Safe against circular `.cause` references
+
 ## Custom Base Class with `extends`
 
 Use `extends` to inherit from a custom base class with shared functionality:
