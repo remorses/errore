@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0
+
+- Add `findCause` to walk the `.cause` chain and find an ancestor matching a specific error class (Go's `errors.As` equivalent)
+- Available as instance method on all tagged errors (`.findCause(ErrorClass)`) and as standalone function (`errore.findCause(err, ErrorClass)`)
+- Returns `T | undefined` for use with optional chaining (`err.findCause(DbError)?.host`)
+- Safe against circular `.cause` references
+- Add docs for `findCause` in README and SKILL.md
+- Add docs for error wrapping with `cause` and custom base class with `extends`
+
 ## 0.9.0
 
 - **BREAKING:** rename `_` to `Error` in matchError handlers, fallback now always required
