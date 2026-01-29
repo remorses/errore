@@ -225,6 +225,8 @@ if (result instanceof Error) {
 The error definitions:
 
 ```ts
+import * as errore from 'errore'
+
 class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found'
@@ -299,6 +301,8 @@ Returns `undefined` if no matching ancestor is found. Safe against circular `.ca
 Use `extends` to inherit from a custom base class. The error will pass `instanceof` for both the base class and the specific error class:
 
 ```ts
+import * as errore from 'errore'
+
 class AppError extends Error {
   statusCode = 500
   toResponse() { return { error: this.message, code: this.statusCode } }

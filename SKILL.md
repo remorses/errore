@@ -212,6 +212,8 @@ found2?.host  // 'db.example.com'
 Use `extends` to inherit from a custom base class with shared functionality:
 
 ```ts
+import * as errore from 'errore'
+
 class AppError extends Error {
   statusCode = 500
   toResponse() { return { error: this.message, code: this.statusCode } }
