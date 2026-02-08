@@ -13,6 +13,9 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "errore": "dist/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -21,10 +24,11 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "SKILL.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/cli.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "worker:dev": "wrangler dev",
