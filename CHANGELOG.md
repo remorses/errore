@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.0
+
+- Add `fingerprint` property to all tagged errors for stable Sentry/logging error grouping
+  - `createTaggedError` errors return `[_tag, messageTemplate]` — groups all instances of the same error class regardless of interpolated values
+  - `TaggedError` errors return `[_tag]`
+  - Directly usable as `event.fingerprint` in Sentry's `beforeSend` hook
+- Add `messageTemplate` property to `createTaggedError` errors — exposes the raw `$variable` template string (e.g. `'User $id not found in $database'`)
+- Include `fingerprint` and `messageTemplate` in `toJSON()` output for structured logging
+- Guard reserved internal keys (`_tag`, `fingerprint`, `messageTemplate`, `name`, `stack`) from being overwritten by user-provided props or template variables
+- Replace `Object.assign(this, args)` in `TaggedError` with key-by-key loop that skips reserved keys
+- Add CLI with `errore skill` command to output SKILL.md contents for LLM context
+
 ## 0.10.0
 
 - Add `findCause` to walk the `.cause` chain and find an ancestor matching a specific error class (Go's `errors.As` equivalent)
