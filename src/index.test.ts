@@ -1258,6 +1258,81 @@ describe('createTaggedError factory', () => {
   })
 })
 
+// ============================================================================
+// Reserved key collision safety
+// ============================================================================
+
+describe('reserved key collisions', () => {
+  test('TaggedError: props with fingerprint key do not corrupt fingerprint getter', () => {
+    class FingerprintError extends TaggedError('FingerprintError')<{
+      fingerprint: string
+      message: string
+    }>() {}
+
+    // Should not throw during construction
+    const err = new FingerprintError({ fingerprint: 'user-provided', message: 'test' })
+
+    // Internal fingerprint getter must win over user-provided value
+    expect(err.fingerprint).toEqual(['FingerprintError'])
+    expect(err._tag).toBe('FingerprintError')
+  })
+
+  test('TaggedError: props with _tag key do not corrupt _tag', () => {
+    class TagCollisionError extends TaggedError('TagCollisionError')<{
+      _tag: string
+      message: string
+    }>() {}
+
+    const err = new TagCollisionError({ _tag: 'spoofed', message: 'test' })
+
+    expect(err._tag).toBe('TagCollisionError')
+  })
+
+  test('createTaggedError: template with $fingerprint does not corrupt fingerprint', () => {
+    const TestError = createTaggedError({
+      name: 'TestError',
+      message: 'Error with $fingerprint value',
+    })
+
+    // Should not throw
+    const err = new TestError({ fingerprint: 'user-value' })
+
+    // fingerprint getter must return stable internal value
+    expect(err.fingerprint).toEqual(['TestError', 'Error with $fingerprint value'])
+    expect(err.messageTemplate).toBe('Error with $fingerprint value')
+    // The message still interpolates the value
+    expect(err.message).toBe('Error with user-value value')
+  })
+
+  test('createTaggedError: template with $messageTemplate does not corrupt messageTemplate', () => {
+    const TestError = createTaggedError({
+      name: 'TestError',
+      message: 'Error: $messageTemplate',
+    })
+
+    const err = new TestError({ messageTemplate: 'user-value' })
+
+    // Internal messageTemplate must be the original template
+    expect(err.messageTemplate).toBe('Error: $messageTemplate')
+    expect(err.fingerprint).toEqual(['TestError', 'Error: $messageTemplate'])
+    // The message still interpolates
+    expect(err.message).toBe('Error: user-value')
+  })
+
+  test('createTaggedError: template with $name does not corrupt error name', () => {
+    const TestError = createTaggedError({
+      name: 'TestError',
+      message: 'Error for $name',
+    })
+
+    const err = new TestError({ name: 'spoofed' })
+
+    expect(err.name).toBe('TestError')
+    expect(err._tag).toBe('TestError')
+    expect(err.message).toBe('Error for spoofed')
+  })
+})
+
 describe('findCause', () => {
   class RootError extends TaggedError('RootError')<{ id: string; message: string }>() {}
   class MiddleError extends TaggedError('MiddleError')<{ step: string; message: string; cause: Error }>() {}

@@ -86,7 +86,7 @@ export type FactoryTaggedErrorInstance<
   /** The original message template with $variable placeholders (e.g. 'User $id not found') */
   readonly messageTemplate: Msg
   /** Stable fingerprint for error grouping in Sentry/logging. Returns [_tag, messageTemplate]. */
-  readonly fingerprint: [Tag, Msg]
+  readonly fingerprint: readonly [Tag, Msg]
   toJSON(): object
   /** Walk the .cause chain to find an ancestor matching a specific error class. */
   findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined
@@ -223,11 +223,14 @@ export function createTaggedError<
   // Use a type assertion to help TypeScript understand the base class
   const TypedBase = BaseError as typeof Error
 
+  // Keys that are managed internally and must not be overwritten by template variables
+  const RESERVED_KEYS = new Set(['_tag', 'messageTemplate', 'fingerprint', 'name', 'stack'])
+
   class Tagged extends TypedBase {
     readonly _tag: Name = tag
     readonly messageTemplate: Msg = messageTemplate
 
-    get fingerprint(): [Name, Msg] {
+    get fingerprint(): readonly [Name, Msg] {
       return [this._tag, this.messageTemplate]
     }
 
@@ -243,10 +246,10 @@ export function createTaggedError<
 
       super(interpolatedMessage, cause !== undefined ? { cause } : undefined)
 
-      // Assign all variables as properties
+      // Assign all variables as properties, skipping reserved internal keys
       if (args) {
         for (const varName of varNames) {
-          if (varName in args) {
+          if (varName in args && !RESERVED_KEYS.has(varName)) {
             ;(this as Record<string, unknown>)[varName] = args[varName]
           }
         }

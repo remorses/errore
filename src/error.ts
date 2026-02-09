@@ -66,7 +66,7 @@ type ErrorClass = new (...args: any[]) => Error
 export type TaggedErrorInstance<Tag extends string, Props, Base extends Error = Error> = Base & {
   readonly _tag: Tag
   /** Stable fingerprint for error grouping in Sentry/logging. Returns [_tag]. */
-  readonly fingerprint: [Tag]
+  readonly fingerprint: readonly [Tag]
   toJSON(): object
   /** Walk the .cause chain to find an ancestor matching a specific error class. */
   findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined
@@ -129,10 +129,13 @@ export const TaggedError: {
     <Props extends Record<string, unknown> = {}>(): TaggedErrorClass<Tag, Props, InstanceType<BaseClass>> => {
       const ActualBase = (BaseClass ?? Error) as typeof Error
 
+      // Keys that are managed internally and must not be overwritten by user props
+      const RESERVED_KEYS = new Set(['_tag', 'fingerprint', 'name', 'stack'])
+
       class Tagged extends ActualBase {
         readonly _tag: Tag = tag
 
-        get fingerprint(): [Tag] {
+        get fingerprint(): readonly [Tag] {
           return [this._tag]
         }
 
@@ -148,7 +151,11 @@ export const TaggedError: {
           super(message, cause !== undefined ? { cause } : undefined)
 
           if (args) {
-            Object.assign(this, args)
+            for (const key of Object.keys(args)) {
+              if (!RESERVED_KEYS.has(key)) {
+                ;(this as Record<string, unknown>)[key] = (args as Record<string, unknown>)[key]
+              }
+            }
           }
 
           Object.setPrototypeOf(this, new.target.prototype)
