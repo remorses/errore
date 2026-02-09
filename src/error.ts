@@ -65,6 +65,8 @@ type ErrorClass = new (...args: any[]) => Error
  */
 export type TaggedErrorInstance<Tag extends string, Props, Base extends Error = Error> = Base & {
   readonly _tag: Tag
+  /** Stable fingerprint for error grouping in Sentry/logging. Returns [_tag]. */
+  readonly fingerprint: [Tag]
   toJSON(): object
   /** Walk the .cause chain to find an ancestor matching a specific error class. */
   findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined
@@ -130,6 +132,10 @@ export const TaggedError: {
       class Tagged extends ActualBase {
         readonly _tag: Tag = tag
 
+        get fingerprint(): [Tag] {
+          return [this._tag]
+        }
+
         /** Type guard for this error class */
         static is(value: unknown): value is Tagged {
           return value instanceof Tagged
@@ -164,6 +170,7 @@ export const TaggedError: {
             _tag: this._tag,
             name: this.name,
             message: this.message,
+            fingerprint: this.fingerprint,
             cause: serializeCause(this.cause),
             stack: this.stack,
           }

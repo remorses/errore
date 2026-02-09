@@ -83,6 +83,10 @@ export type FactoryTaggedErrorInstance<
 > = Base & {
   readonly _tag: Tag
   readonly message: string
+  /** The original message template with $variable placeholders (e.g. 'User $id not found') */
+  readonly messageTemplate: Msg
+  /** Stable fingerprint for error grouping in Sentry/logging. Returns [_tag, messageTemplate]. */
+  readonly fingerprint: [Tag, Msg]
   toJSON(): object
   /** Walk the .cause chain to find an ancestor matching a specific error class. */
   findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined
@@ -221,6 +225,11 @@ export function createTaggedError<
 
   class Tagged extends TypedBase {
     readonly _tag: Name = tag
+    readonly messageTemplate: Msg = messageTemplate
+
+    get fingerprint(): [Name, Msg] {
+      return [this._tag, this.messageTemplate]
+    }
 
     static readonly tag: Name = tag
 
@@ -261,6 +270,8 @@ export function createTaggedError<
         _tag: this._tag,
         name: this.name,
         message: this.message,
+        messageTemplate: this.messageTemplate,
+        fingerprint: this.fingerprint,
         cause: serializeCause(this.cause),
         stack: this.stack,
       }

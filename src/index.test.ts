@@ -449,6 +449,29 @@ describe('TaggedError', () => {
   })
 })
 
+describe('TaggedError fingerprint', () => {
+  test('fingerprint returns [_tag]', () => {
+    const err = new NotFoundError({ id: '123' })
+
+    expect(err.fingerprint).toEqual(['NotFoundError'])
+  })
+
+  test('fingerprint is stable across different messages', () => {
+    const err1 = new NotFoundError({ id: '123' })
+    const err2 = new NotFoundError({ id: '456' })
+
+    expect(err1.message).not.toBe(err2.message)
+    expect(err1.fingerprint).toEqual(err2.fingerprint)
+  })
+
+  test('toJSON includes fingerprint', () => {
+    const err = new ValidationError({ field: 'email', message: 'Invalid' })
+    const json = err.toJSON() as Record<string, unknown>
+
+    expect(json.fingerprint).toEqual(['ValidationError'])
+  })
+})
+
 describe('matchError', () => {
   test('exhaustive pattern matching by _tag', () => {
     function fetchData(): NotFoundError | ValidationError | string {
@@ -1171,6 +1194,67 @@ describe('createTaggedError factory', () => {
     expect(TestError.is(err)).toBe(true)
     expect(TestError.is(plainErr)).toBe(false)
     expect(TestError.is(customErr)).toBe(false)
+  })
+
+  test('messageTemplate exposes the raw template string', () => {
+    const NotFoundError = createTaggedError({
+      name: 'NotFoundError',
+      message: 'User $id not found in $database',
+    })
+
+    const err = new NotFoundError({ id: '123', database: 'users' })
+
+    expect(err.message).toBe('User 123 not found in users')
+    expect(err.messageTemplate).toBe('User $id not found in $database')
+  })
+
+  test('fingerprint returns [_tag, messageTemplate]', () => {
+    const NotFoundError = createTaggedError({
+      name: 'NotFoundError',
+      message: 'User $id not found in $database',
+    })
+
+    const err = new NotFoundError({ id: '123', database: 'users' })
+
+    expect(err.fingerprint).toEqual(['NotFoundError', 'User $id not found in $database'])
+  })
+
+  test('fingerprint is stable across different interpolated values', () => {
+    const NotFoundError = createTaggedError({
+      name: 'NotFoundError',
+      message: 'User $id not found in $database',
+    })
+
+    const err1 = new NotFoundError({ id: '123', database: 'users' })
+    const err2 = new NotFoundError({ id: '456', database: 'accounts' })
+
+    expect(err1.message).not.toBe(err2.message)
+    expect(err1.fingerprint).toEqual(err2.fingerprint)
+  })
+
+  test('toJSON includes messageTemplate and fingerprint', () => {
+    const TestError = createTaggedError({
+      name: 'TestError',
+      message: 'Error with $code and $detail',
+    })
+
+    const err = new TestError({ code: 'E001', detail: 'something broke' })
+    const json = err.toJSON() as Record<string, unknown>
+
+    expect(json.messageTemplate).toBe('Error with $code and $detail')
+    expect(json.fingerprint).toEqual(['TestError', 'Error with $code and $detail'])
+  })
+
+  test('error without variables has static messageTemplate', () => {
+    const EmptyError = createTaggedError({
+      name: 'EmptyError',
+      message: 'Something went wrong',
+    })
+
+    const err = new EmptyError()
+
+    expect(err.messageTemplate).toBe('Something went wrong')
+    expect(err.fingerprint).toEqual(['EmptyError', 'Something went wrong'])
   })
 })
 
