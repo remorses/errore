@@ -668,3 +668,137 @@ async function getTodo(
 | Error context | Just a string | Structured properties + cause chain |
 | Tracing integration | `result.error` string to span | `span.recordException(error)` with full stack |
 | Composability | Each layer adds nesting | Each layer is another `if (x instanceof Error)` |
+
+---
+
+## 5. From Effect.ts: Video Share Page
+
+A React server component that fetches a video with policy checks, handles password-protected videos, private videos, and missing videos — each with distinct UI.
+
+### Before (Effect.ts)
+
+```tsx
+return Effect.gen(function* () {
+  const videosPolicy = yield* VideosPolicy
+
+  const [video] = yield* Effect.promise(() =>
+    fetchVideo(videoId)
+  ).pipe(Policy.withPublicPolicy(videosPolicy.canView(videoId)))
+
+  return Option.fromNullable(video)
+}).pipe(
+  Effect.flatten,
+  Effect.map((video) => ({ needsPassword: false, video }) as const),
+  Effect.catchTag("VerifyVideoPasswordError", () =>
+    Effect.succeed({ needsPassword: true } as const),
+  ),
+  Effect.map((data) => (
+    <div className="min-h-screen flex flex-col bg-[#F7F8FA]">
+      <PasswordOverlay isOpen={data.needsPassword} videoId={videoId} />
+      {!data.needsPassword && (
+        <AuthorizedContent video={data.video} searchParams={searchParams} />
+      )}
+    </div>
+  )),
+  Effect.catchTags({
+    PolicyDenied: () =>
+      Effect.succeed(
+        <div className="flex flex-col justify-center items-center p-4 min-h-screen text-center">
+          <Logo className="size-32" />
+          <h1 className="mb-2 text-2xl font-semibold">
+            This video is private
+          </h1>
+          <p className="text-gray-400">
+            If you own this video, please <Link href="/login">sign in</Link>{" "}
+            to manage sharing.
+          </p>
+        </div>,
+      ),
+    NoSuchElementException: () => {
+      console.log("[ShareVideoPage] No video found for videoId:", videoId)
+      return Effect.succeed(<p>No video found</p>)
+    },
+  }),
+)
+```
+
+**Problems:**
+- `Effect.gen` + `yield*` to do what `async/await` already does
+- `Option.fromNullable` + `Effect.flatten` to turn `null` into `NoSuchElementException` — a roundabout way to check `if (!video)`
+- `Effect.catchTag("VerifyVideoPasswordError")` mid-pipe transforms one error into a different data shape, then `Effect.map` renders JSX — two separate pipe stages for one concept
+- `Effect.catchTags` at the end catches errors from anywhere in the pipe — the error source is disconnected from the handler
+- JSX is buried inside `Effect.succeed(...)` wrappers
+- Reading order is bottom-up: you see the error handlers last, far from where errors originate
+
+### After (errore)
+
+```tsx
+import * as errore from 'errore'
+
+class PolicyDeniedError extends errore.createTaggedError({
+  name: 'PolicyDeniedError',
+  message: 'Access denied for video $videoId',
+}) {}
+
+class VerifyVideoPasswordError extends errore.createTaggedError({
+  name: 'VerifyVideoPasswordError',
+  message: 'Video $videoId requires password verification',
+}) {}
+```
+
+```tsx
+const videoResult = await fetchVideoWithPolicy(videoId)
+
+// PolicyDenied → private video page
+if (videoResult instanceof PolicyDeniedError) {
+  return (
+    <div className="flex flex-col justify-center items-center p-4 min-h-screen text-center">
+      <Logo className="size-32" />
+      <h1 className="mb-2 text-2xl font-semibold">
+        This video is private
+      </h1>
+      <p className="text-gray-400">
+        If you own this video, please <Link href="/login">sign in</Link>{" "}
+        to manage sharing.
+      </p>
+    </div>
+  )
+}
+
+// Password required → show overlay only
+if (videoResult instanceof VerifyVideoPasswordError) {
+  return (
+    <div className="min-h-screen flex flex-col bg-[#F7F8FA]">
+      <PasswordOverlay isOpen={true} videoId={videoId} />
+    </div>
+  )
+}
+
+// Unexpected errors bubble up
+if (videoResult instanceof Error) return videoResult
+
+const [video] = videoResult
+
+// No video found
+if (!video) {
+  console.log("[ShareVideoPage] No video found for videoId:", videoId)
+  return <p>No video found</p>
+}
+
+// Success
+return (
+  <div className="min-h-screen flex flex-col bg-[#F7F8FA]">
+    <PasswordOverlay isOpen={false} videoId={videoId} />
+    <AuthorizedContent video={video} searchParams={searchParams} />
+  </div>
+)
+```
+
+**What changed:**
+- No generators, no `yield*`, no `Option.fromNullable`, no `Effect.flatten` — just `await` and `if`
+- Each error is handled right where you'd expect: `instanceof` check → early return with JSX
+- Null check is `if (!video)` instead of `Option.fromNullable` + `Effect.flatten` + `NoSuchElementException`
+- JSX is returned directly, not wrapped in `Effect.succeed(...)`
+- Reading order is top-down: errors are handled first, happy path falls through to the bottom
+- The password-protected case is a separate `return`, not a mid-pipe data shape transformation (`{ needsPassword: true }` → re-read later in `Effect.map`)
+- No pipe chain to mentally unwind — each branch is self-contained
