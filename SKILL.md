@@ -24,7 +24,7 @@ console.log(user.name)                  // TypeScript knows: User
 6. Always annotate return types with the error union — `Promise<MyError | OtherError | Value>`
 7. Use `cause` to wrap errors — `new MyError({ ..., cause: originalError })`
 8. Use `| null` for optional values, not `| undefined` — three-way narrowing: `instanceof Error`, `=== null`, then value
-9. Use `const` + expressions, never `let` + try-catch — ternaries, IIFEs, `errore.unwrapOr`
+9. Use `const` + expressions, never `let` + try-catch — ternaries, IIFEs, `instanceof Error`
 10. Use early returns, never nested if-else — check error, return, continue flat
 11. Always include `Error` handler in `matchError` — required fallback for plain Error instances
 
@@ -43,6 +43,52 @@ These TypeScript practices complement errore's philosophy:
 - **Module imports for node builtins** — `import fs from 'node:fs'` then `fs.readFileSync(...)`, not named imports
 
 ## Patterns
+
+### Expressions over Statements
+
+Always prefer `const` with an expression over `let` assigned later. This eliminates mutable state and makes control flow explicit. Escalate by complexity:
+
+**Simple: ternary**
+```ts
+const user = fetchResult instanceof Error
+  ? fallbackUser
+  : fetchResult
+```
+
+**Medium: IIFE with early returns**
+
+When a ternary gets too nested or involves multiple checks, use an immediately invoked function expression. The IIFE scopes all intermediate variables and uses early returns for clarity:
+
+```ts
+const config: Config = (() => {
+  const envResult = loadFromEnv()
+  if (!(envResult instanceof Error)) return envResult
+
+  const fileResult = loadFromFile()
+  if (!(fileResult instanceof Error)) return fileResult
+
+  return defaultConfig
+})()
+```
+
+**Never: `let` assigned in branches**
+```ts
+// BAD: mutable variable, assigned across branches
+let config
+const envResult = loadFromEnv()
+if (!(envResult instanceof Error)) {
+  config = envResult
+} else {
+  const fileResult = loadFromFile()
+  if (!(fileResult instanceof Error)) {
+    config = fileResult
+  } else {
+    config = defaultConfig
+  }
+}
+```
+
+> Every `let x; if (...) { x = ... }` can be rewritten as `const x = ternary` or `const x: T = (() => { ... })()`. The IIFE pattern is idiomatic in errore code — it keeps error handling flat with early returns while producing a single immutable binding.
 
 ### Defining Errors
 
@@ -297,13 +343,11 @@ try {
 
 <!-- good -->
 ```ts
-const config = errore.unwrapOr(
-  errore.try(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
-  { port: 3000, debug: false },
-)
+const result = errore.try(() => JSON.parse(fs.readFileSync('config.json', 'utf-8')))
+const config = result instanceof Error ? { port: 3000, debug: false } : result
 ```
 
-> `unwrapOr` replaces the `let` + try-catch pattern with a single expression. No mutation, no intermediate state.
+> A ternary on `instanceof Error` replaces `let` + try-catch. Single expression, no mutation, no intermediate state.
 
 ### Error Wrapping with Cause
 
@@ -375,7 +419,7 @@ while (attempts < 3) {
 async function fetchWithRetry(): Promise<NetworkError | Data> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const result = await fetchData()
-    if (errore.isOk(result)) return result
+    if (!(result instanceof Error)) return result
 
     if (attempt < 2) await sleep(1000 * 2 ** attempt)
   }
@@ -383,7 +427,7 @@ async function fetchWithRetry(): Promise<NetworkError | Data> {
 }
 ```
 
-> A plain `for` loop with `continue` replaces recursive execute + throw-to-retry. Each failure point decides independently whether to retry or return.
+> A plain `for` loop with `instanceof Error` replaces recursive execute + throw-to-retry. Each failure point decides independently whether to retry or return.
 
 ### Custom Base Classes
 
@@ -449,12 +493,12 @@ async function legacyHandler(id: string) {
 ```ts
 async function legacyHandler(id: string) {
   const user = await getUser(id)
-  // unwrap throws if error, returns value otherwise
-  return errore.unwrap(user, 'Failed to get user')
+  if (user instanceof Error) throw new Error('Failed to get user', { cause: user })
+  return user
 }
 ```
 
-> Use `errore.unwrap` at boundaries where legacy code expects exceptions. Migrate gradually: leaf functions first, then work upward.
+> At boundaries where legacy code expects exceptions, check `instanceof Error` and throw with `cause`. This preserves the error chain and keeps the pattern consistent.
 
 ### Partition: Splitting Successes and Failures
 
@@ -500,15 +544,18 @@ try {
 
 <!-- good -->
 ```ts
-const envConfig = loadFromEnv()
-const fileConfig = loadFromFile()
+const config: Config = (() => {
+  const envConfig = loadFromEnv()
+  if (!(envConfig instanceof Error)) return envConfig
 
-const config = errore.isOk(envConfig) ? envConfig
-  : errore.isOk(fileConfig) ? fileConfig
-  : defaultConfig
+  const fileConfig = loadFromFile()
+  if (!(fileConfig instanceof Error)) return fileConfig
+
+  return defaultConfig
+})()
 ```
 
-> Chain with ternaries and `errore.isOk`. No nested try-catch, no mutation.
+> An IIFE with early returns replaces nested try-catch. Each source is tried in order, first success wins. All scoped inside a single `const` assignment.
 
 ### Input Validation
 
@@ -577,15 +624,27 @@ const user = fetchResult instanceof RecordNotFoundError
 ### unknown | Error collapses to unknown
 
 ```ts
-// BAD: Error | unknown simplifies to unknown — no narrowing after instanceof check
-function parse(input: string): Error | unknown { ... }
+// BAD: res.json() returns unknown, so the union collapses
+async function fetchUser(id: string) {
+  const res = await fetch(`/users/${id}`)
+  if (!res.ok) return new NotFoundError({ id })
+  return await res.json()  // return type is NotFoundError | unknown → unknown
+}
 
-const result = parse('{}')
-if (result instanceof Error) return result
-result.field  // ERROR: result is still unknown
+const user = await fetchUser('123')
+if (user instanceof Error) return user
+user.name  // ERROR: user is still unknown
 
-// GOOD: use explicit types
-function parse(input: string): Error | ParsedData { ... }
+// GOOD: cast with `as` to give the success path a concrete type
+async function fetchUser(id: string) {
+  const res = await fetch(`/users/${id}`)
+  if (!res.ok) return new NotFoundError({ id })
+  return (await res.json()) as User  // return type is NotFoundError | User
+}
+
+const user = await fetchUser('123')
+if (user instanceof Error) return user
+user.name  // works — user is User
 ```
 
 ### CustomError | Error is ambiguous when CustomError extends Error
@@ -642,23 +701,13 @@ const data = await errore.tryAsync({
   catch: (e) => new MyError({ resource: 'api', reason: 'call failed', cause: e }),
 })
 
-// --- Type guards ---
-errore.isError(value)     // value is Error
-errore.isOk(value)        // value is not Error
+// --- Check errors (plain instanceof, always) ---
+if (result instanceof Error) return result           // early return
+if (!(result instanceof Error)) console.log(result)  // negated check
+result instanceof MyError                            // narrow to specific error type
+const name = result instanceof Error ? 'unknown' : result.name  // ternary for simple cases
 
-// --- Transform ---
-errore.map(result, (v) => v.toUpperCase())          // transform value, pass error through
-errore.mapError(result, (e) => new WrapperError(e)) // transform error, pass value through
-errore.andThen(result, (v) => nextStep(v))           // chain errore-returning functions
-
-// --- Extract ---
-errore.unwrap(result)                 // extract value or throw
-errore.unwrap(result, 'custom msg')   // extract value or throw with message
-errore.unwrapOr(result, fallback)     // extract value or use fallback
-errore.match(result, {                // pattern match
-  ok: (v) => `got ${v}`,
-  err: (e) => `failed: ${e.message}`,
-})
+// --- Split arrays ---
 errore.partition(results)             // [values[], errors[]]
 
 // --- Match errors ---
