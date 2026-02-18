@@ -31,7 +31,7 @@
     "build": "tsc && chmod +x dist/cli.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "bench": "bun run bench/effect-vs-errore.ts",
+    "bench": "bun run benchmarks/effect-vs-errore.ts",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy"
   },
