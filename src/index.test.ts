@@ -45,7 +45,12 @@ class NetworkError extends TaggedError('NetworkError')<{
 type User = { id: string; name: string }
 
 // Helper functions that return union types (realistic pattern)
-function getUser(found: boolean): NotFoundError | User {
+function getUser(found: boolean): NotFoundError | User  {
+  if (!found) return new NotFoundError({ id: '123' })
+  return { id: '1', name: 'Alice' }
+}
+// Helper functions that return union types (realistic pattern)
+function mixedError(found: boolean): NotFoundError | User | Error  {
   if (!found) return new NotFoundError({ id: '123' })
   return { id: '1', name: 'Alice' }
 }
@@ -90,6 +95,17 @@ describe('instanceof Error / isOk', () => {
       // TypeScript knows: result is NotFoundError
       expect(result.id).toBe('123')
     }
+  })
+  test('Error | NotFoundError does not collapse to Error', () => {
+    const result = mixedError(false) // returns Error | NotFoundError | User
+    // Error | NotFoundError
+    if (result instanceof NotFoundError) {
+      console.error(result)
+    }
+    if (result instanceof Error) {
+      return result
+    }
+    console.log(result.id)
   })
 })
 
