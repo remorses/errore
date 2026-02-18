@@ -1,6 +1,11 @@
 // Benchmark: Effect.gen (generators) vs errore (plain instanceof).
 // Compares speed and memory for sync and async loops with typed error handling.
 // Run: bun run bench
+//
+// Both sides do identical work: fetch user by ID → validate → collect results.
+// Every 7th ID triggers NotFoundError, every 13th triggers ValidationError.
+// Effect uses idiomatic Data.TaggedError + Effect.gen + yield*.
+// errore uses createTaggedError + instanceof checks.
 
 import { run, bench, group, summary, do_not_optimize } from 'mitata'
 import { Effect, Data, Either } from 'effect'
@@ -80,15 +85,12 @@ function errValidateUser(user: User): User | ErrValidation {
 // ── Effect async implementations ─────────────────────────────────────────────
 
 function effFetchUserAsync(id: number) {
-  return Effect.promise<User | 'not_found'>(() =>
-    Promise.resolve(id % 7 === 0 ? ('not_found' as const) : makeUser(id)),
-  ).pipe(
-    Effect.flatMap((result) =>
-      result === 'not_found'
-        ? Effect.fail(new EffNotFound({ id }))
-        : Effect.succeed(result),
-    ),
-  )
+  return Effect.async<User, EffNotFound>((resume) => {
+    Promise.resolve().then(() => {
+      if (id % 7 === 0) resume(Effect.fail(new EffNotFound({ id })))
+      else resume(Effect.succeed(makeUser(id)))
+    })
+  })
 }
 
 // ── errore async implementations ─────────────────────────────────────────────
@@ -216,12 +218,12 @@ group('Sync loop — short-circuit on first error', () => {
         for (const id of ids) {
           const user = errFetchUser(id)
           if (user instanceof Error) {
-            do_not_optimize(results)
+            do_not_optimize([] as User[])
             return
           }
           const validated = errValidateUser(user)
           if (validated instanceof Error) {
-            do_not_optimize(results)
+            do_not_optimize([] as User[])
             return
           }
           results.push(validated)
