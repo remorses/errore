@@ -31,6 +31,7 @@
     "build": "tsc && chmod +x dist/cli.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "bench": "bun run bench/effect-vs-errore.ts",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy"
   },
@@ -45,7 +46,9 @@
   "author": "remorses",
   "license": "MIT",
   "devDependencies": {
+    "effect": "^3.19.18",
     "hono": "^4.11.5",
+    "mitata": "^1.0.34",
     "typescript": "^5.0.0",
     "vitest": "^3.2.4"
   }
