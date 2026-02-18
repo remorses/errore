@@ -42,6 +42,40 @@ These TypeScript practices complement errore's philosophy:
 - **Type empty arrays** — `const items: string[] = []` not `const items = []`
 - **Module imports for node builtins** — `import fs from 'node:fs'` then `fs.readFileSync(...)`, not named imports
 
+- **`.filter(isTruthy)` not `.filter(Boolean)`** — `Boolean` doesn't narrow types, so `(T | null)[]` stays `(T | null)[]` after filtering. Use a type guard instead:
+  ```ts
+  // BAD: TypeScript still thinks items is (User | null)[]
+  const items = results.filter(Boolean)
+
+  // GOOD: properly narrows to User[]
+  function isTruthy<T>(value: T): value is NonNullable<T> { return Boolean(value) }
+  const items = results.filter(isTruthy)
+  ```
+
+- **`controller.abort(new Error())` not string** — always pass an Error instance to `abort()` so catch blocks receive a real Error with a stack trace, not a string:
+  ```ts
+  // BAD: catch receives a string, not an Error
+  controller.abort('timeout')
+
+  // GOOD: catch receives an Error instance with cause chain
+  controller.abort(new Error('Request timed out'))
+  ```
+
+- **Never silently suppress errors in catch blocks** — empty `catch {}` hides failures. With errore you rarely need catch at all, but at boundaries where you must, always handle or log:
+  ```ts
+  // BAD: swallows the error, debugging nightmare
+  try { await sendEmail(user.email) } catch {}
+
+  // GOOD: log and continue if non-critical
+  const emailResult = await errore.tryAsync({
+    try: () => sendEmail(user.email),
+    catch: (e) => new EmailError({ email: user.email, cause: e }),
+  })
+  if (emailResult instanceof Error) {
+    console.warn('Failed to send email:', emailResult.message)
+  }
+  ```
+
 ## Patterns
 
 ### Expressions over Statements
