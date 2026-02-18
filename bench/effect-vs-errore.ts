@@ -4,12 +4,14 @@
 //
 // Both sides do identical work: fetch user by ID → validate → collect results.
 // Every 7th ID triggers NotFoundError, every 13th triggers ValidationError.
+// Both sides do identical work: fetch user by ID → validate → collect results.
+// Every 7th ID triggers NotFoundError, every 13th triggers ValidationError.
 // Effect uses idiomatic Data.TaggedError + Effect.gen + yield*.
-// errore uses createTaggedError + instanceof checks.
+// errore uses TaggedError + instanceof checks.
 
 import { run, bench, group, summary, do_not_optimize } from 'mitata'
-import { Effect, Data, Either } from 'effect'
-import { createTaggedError } from '../src/factory.js'
+import { Effect, Data } from 'effect'
+import { TaggedError } from '../src/error.js'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,17 +33,16 @@ class EffValidation extends Data.TaggedError('ValidationError')<{
   readonly reason: string
 }> {}
 
-// ── errore errors (createTaggedError — idiomatic errore) ─────────────────────
+// ── errore errors (TaggedError — idiomatic errore) ───────────────────────────
 
-class ErrNotFound extends createTaggedError({
-  name: 'NotFoundError',
-  message: 'User $id not found',
-}) {}
+class ErrNotFound extends TaggedError('NotFoundError')<{
+  id: number
+}>() {}
 
-class ErrValidation extends createTaggedError({
-  name: 'ValidationError',
-  message: 'Validation failed for user $id: $reason',
-}) {}
+class ErrValidation extends TaggedError('ValidationError')<{
+  id: number
+  reason: string
+}>() {}
 
 // ── Shared logic ─────────────────────────────────────────────────────────────
 // Every 7th ID → not found, every 13th → validation error, rest → success.
