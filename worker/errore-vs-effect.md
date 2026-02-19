@@ -782,7 +782,7 @@ async function queryDb(
 ): Promise<DbError | Row[]> {
   await using cleanup = new errore.AsyncDisposableStack()
 
-  // !focus(1:4)
+  // !focus(1:6)
   const conn = createConnection()
   console.log('opened')
   cleanup.defer(() => {
@@ -790,7 +790,7 @@ async function queryDb(
     console.log('closed')
   })
 
-  // !focus(1:2)
+  // !focus(1:5)
   // If anything fails, connection is still closed
   return errore.tryAsync({
     try: () => query(conn, sql),
@@ -826,7 +826,7 @@ const program = Effect.gen(function* () {
 )
 
 // onExit: cleanup receives the Exit value
-// !focus(1:7)
+// !focus(1:8)
 const withExit = Effect.gen(function* () {
   const data = yield* fetchData()
   return data
@@ -842,13 +842,13 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:3)
+// !focus(1:4)
 // await using = cleanup runs on every exit path
 async function getData(): Promise<FetchError | Data> {
   await using cleanup =
     new errore.AsyncDisposableStack()
 
-  // !focus(1:2)
+  // !focus(1:3)
   cleanup.defer(() =>
     console.log('Cleanup completed')
   )
@@ -871,7 +871,7 @@ Registering cleanup actions within a scope that execute when the scope closes â€
 ```typescript
 import { Effect, Console } from 'effect'
 
-// !focus(1:8)
+// !focus(1:9)
 const program = Effect.gen(function* () {
   yield* Effect.addFinalizer((exit) =>
     Console.log(
@@ -893,7 +893,7 @@ await Effect.runPromise(runnable)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:6)
+// !focus(1:7)
 async function getData(): Promise<FetchError | Data> {
   await using cleanup =
     new errore.AsyncDisposableStack()
@@ -921,7 +921,7 @@ Managing multiple resources where cleanup order matters â€” each resource must b
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:7)
+// !focus(1:8)
 const withDb = Effect.acquireRelease(
   Effect.promise(() => connectDb()),
   (db) => Effect.promise(() => db.close())
@@ -931,7 +931,7 @@ const withCache = Effect.acquireRelease(
   (cache) => Effect.promise(() => cache.flush())
 )
 
-// !focus(1:9)
+// !focus(1:14)
 const program = Effect.scoped(
   Effect.gen(function* () {
     const db = yield* withDb
@@ -953,7 +953,7 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:2)
+// !focus(1:3)
 async function processOrder(
   orderId: string
 ): Promise<DbError | CacheError | Order> {
@@ -969,7 +969,7 @@ async function processOrder(
   if (db instanceof Error) return db
   cleanup.defer(() => db.close())
 
-  // !focus(1:4)
+  // !focus(1:5)
   const cache = await errore.tryAsync({
     try: () => openCache(),
     catch: (e) =>
@@ -1012,7 +1012,7 @@ const program = Effect.scoped(
     )
   })
 ).pipe(
-  // !focus(1:5)
+  // !focus(1:6)
   Effect.timeoutFail({
     duration: '5 seconds',
     onTimeout: () => new TimeoutError({
@@ -1027,14 +1027,14 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:4)
+// !focus(1:5)
 async function queryWithTimeout(
   sql: string
 ): Promise<TimeoutError | DbError | Row[]> {
   await using cleanup =
     new errore.AsyncDisposableStack()
 
-  // !focus(1:3)
+  // !focus(1:6)
   // AbortController for cancellation
   const controller = new AbortController()
   const timer = setTimeout(
@@ -1042,7 +1042,7 @@ async function queryWithTimeout(
   )
   cleanup.defer(() => clearTimeout(timer))
 
-  // !focus(1:4)
+  // !focus(1:6)
   const conn = await errore.tryAsync({
     try: () => connect({ signal: controller.signal }),
     catch: (e) => e.name === 'AbortError'
@@ -1052,7 +1052,7 @@ async function queryWithTimeout(
   if (conn instanceof Error) return conn
   cleanup.defer(() => conn.close())
 
-  // !focus(1:4)
+  // !focus(1:6)
   return errore.tryAsync({
     try: () => conn.query(sql),
     catch: (e) => e.name === 'AbortError'
