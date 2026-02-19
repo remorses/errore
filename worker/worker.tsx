@@ -544,6 +544,46 @@ const user = await getUser('123')
 if (user instanceof Error) return user
 console.log(user.name)`
 
+// Resource cleanup (defer)
+const codeDeferBefore = `// Nested try/finally for each resource
+async function processOrder(orderId: string) {
+  const db = await connectDb()
+  try {
+    const cache = await openCache()
+    try {
+      const order = await db.query(orderId)
+      const receipt = await processPayment(order)
+      await cache.set(orderId, receipt)
+      return receipt
+    } finally {
+      await cache.flush()
+    }
+  } finally {
+    await db.close()
+  }
+}`
+
+const codeDeferAfter = `// Go-like defer with await using
+async function processOrder(orderId: string): Promise<DbError | Receipt> {
+  await using cleanup = new errore.AsyncDisposableStack()
+
+  const db = await errore.tryAsync({
+    try: () => connectDb(),
+    catch: (e) => new DbError({ orderId, cause: e }),
+  })
+  if (db instanceof Error) return db
+  cleanup.defer(() => db.close())
+
+  const cache = await openCache()
+  cleanup.defer(() => cache.flush())
+
+  const order = await db.query(orderId)
+  const receipt = await processPayment(order)
+  await cache.set(orderId, receipt)
+  return receipt
+  // cleanup runs automatically: cache.flush() → db.close()
+}`
+
 // Effect comparison
 const codeEffect = `// Effect.ts - a paradigm shift
 import { Effect, pipe } from 'effect'
@@ -684,6 +724,16 @@ function Page() {
           <pre class="language-typescript"><code class="language-typescript">${codeMigrationValidateBefore}</code></pre>
           <pre class="language-typescript"><code class="language-typescript">${codeMigrationValidateAfter}</code></pre>
 
+          <h2>Resource Cleanup</h2>
+
+          <p>errore ships <code>DisposableStack</code> polyfills for Go-like <code>defer</code> cleanup. Use with TypeScript's <code>using</code> keyword — cleanup runs automatically when the scope exits, in reverse order:</p>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeDeferBefore}</code></pre>
+
+          <pre class="language-typescript"><code class="language-typescript">${codeDeferAfter}</code></pre>
+
+          <p><code>await using</code> guarantees cleanup on every exit path — normal return, early error return, or exception. No <code>try/finally</code> nesting. Adding more resources is just another <code>cleanup.defer()</code>.</p>
+
           <h2>Vs neverthrow / better-result</h2>
 
           <p>These libraries wrap values in a <code>Result&lt;T, E&gt;</code> container. You construct with <code>ok()</code> and <code>err()</code>, then unwrap with <code>.value</code> and <code>.error</code>:</p>
@@ -704,7 +754,7 @@ function Page() {
 
           <pre class="language-typescript"><code class="language-typescript">${codeEffectErrore}</code></pre>
 
-          <p><strong>Use Effect</strong> when you want DI, structured concurrency, and the full FP experience. <strong>Use errore</strong> when you just want type-safe errors without rewriting your codebase.</p>
+          <p><strong>Use Effect</strong> when you want DI, structured concurrency, and the full FP experience. <strong>Use errore</strong> when you just want type-safe errors without rewriting your codebase. For resource cleanup, Effect uses <code>Scope</code> + <code>acquireRelease</code> + <code>addFinalizer</code>. errore uses native <code>using</code> + <code>DisposableStack.defer()</code> — same guarantee, zero framework.</p>
 
           <p><a href="/errore-vs-effect">See the full side-by-side comparison →</a></p>
 

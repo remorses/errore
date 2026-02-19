@@ -17,3 +17,6 @@ export type { TaggedErrorInstance, TaggedErrorClass } from './error.js'
 // Factory API for tagged errors with $variable interpolation
 export { createTaggedError } from './factory.js'
 export type { FactoryTaggedErrorClass, FactoryTaggedErrorInstance } from './factory.js'
+
+// Resource management (DisposableStack polyfills)
+export { DisposableStack, AsyncDisposableStack } from './disposable.js'

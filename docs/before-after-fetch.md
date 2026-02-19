@@ -666,12 +666,156 @@ async function getTodo(
 | Control flow | Nested try/catch, throw for jumps | Flat: check, return, continue |
 | Retries | Recursive `execute()` + throw to outer catch | `for` loop + `continue` |
 | Error context | Just a string | Structured properties + cause chain |
+| Resource cleanup | Nested try/finally per resource | `await using` + `DisposableStack.defer()` |
 | Tracing integration | `result.error` string to span | `span.recordException(error)` with full stack |
 | Composability | Each layer adds nesting | Each layer is another `if (x instanceof Error)` |
 
 ---
 
-## 5. From Effect.ts: Video Share Page
+## 5. Resource Cleanup: Database + Cache
+
+Managing multiple resources that need cleanup — regardless of success or failure.
+
+### Before
+
+```ts
+async function processOrder(orderId: string): Promise<
+  | { ok: true; receipt: Receipt }
+  | { ok: false; error: "DbError" | "CacheError" | "ProcessingError" }
+> {
+  const db = await connectDb()
+  try {
+    const cache = await openCache()
+    try {
+      const order = await db.query(`SELECT * FROM orders WHERE id = $1`, [orderId])
+      if (!order) return { ok: false, error: "DbError" }
+
+      const receipt = await processPayment(order)
+      await cache.set(`receipt:${orderId}`, receipt)
+      return { ok: true, receipt }
+    } catch (e) {
+      return { ok: false, error: "ProcessingError" }
+    } finally {
+      await cache.flush()
+    }
+  } catch (e) {
+    return { ok: false, error: "DbError" }
+  } finally {
+    await db.close()
+  }
+}
+```
+
+**Problems:**
+- Nested try/finally for each resource — deeper nesting with every new resource
+- Error handling and cleanup are tangled together in the same blocks
+- If `cache.flush()` throws, it masks the original error
+- Adding a third resource (e.g. a lock) means another nesting level
+
+### After
+
+```ts
+import * as errore from "errore"
+
+class DbError extends errore.createTaggedError({
+  name: "DbError",
+  message: "Database operation failed for order $orderId",
+}) {}
+
+class CacheError extends errore.createTaggedError({
+  name: "CacheError",
+  message: "Cache operation failed for order $orderId",
+}) {}
+
+class ProcessingError extends errore.createTaggedError({
+  name: "ProcessingError",
+  message: "Payment processing failed for order $orderId",
+}) {}
+
+async function processOrder(
+  orderId: string
+): Promise<DbError | CacheError | ProcessingError | Receipt> {
+  await using cleanup = new errore.AsyncDisposableStack()
+
+  const db = await errore.tryAsync({
+    try: () => connectDb(),
+    catch: (e) => new DbError({ orderId, cause: e }),
+  })
+  if (db instanceof Error) return db
+  cleanup.defer(() => db.close())
+
+  const cache = await errore.tryAsync({
+    try: () => openCache(),
+    catch: (e) => new CacheError({ orderId, cause: e }),
+  })
+  if (cache instanceof Error) return cache
+  cleanup.defer(() => cache.flush())
+
+  const order = await errore.tryAsync({
+    try: () => db.query(`SELECT * FROM orders WHERE id = $1`, [orderId]),
+    catch: (e) => new DbError({ orderId, cause: e }),
+  })
+  if (order instanceof Error) return order
+
+  const receipt = await errore.tryAsync({
+    try: () => processPayment(order),
+    catch: (e) => new ProcessingError({ orderId, cause: e }),
+  })
+  if (receipt instanceof Error) return receipt
+
+  await cache.set(`receipt:${orderId}`, receipt)
+  return receipt
+  // cleanup runs automatically: cache.flush() → db.close()
+}
+```
+
+**What changed:**
+- `await using cleanup = new errore.AsyncDisposableStack()` replaces all nested try/finally blocks
+- `cleanup.defer()` registers cleanup in the order resources are acquired — they run in reverse (LIFO), so cache flushes before db closes
+- Cleanup runs on every exit path: normal return, early error return, or thrown exception
+- Adding more resources is just another `cleanup.defer()` — no extra nesting
+- Each error type is distinct and typed in the return signature
+
+### Effect.ts equivalent
+
+```ts
+import { Effect } from "effect"
+
+const processOrder = (orderId: string) =>
+  Effect.acquireRelease(
+    connectDbEffect,
+    (db) => Effect.promise(() => db.close())
+  ).pipe(
+    Effect.flatMap((db) =>
+      Effect.acquireRelease(
+        openCacheEffect,
+        (cache) => Effect.promise(() => cache.flush())
+      ).pipe(
+        Effect.flatMap((cache) =>
+          Effect.gen(function* () {
+            const order = yield* Effect.tryPromise({
+              try: () => db.query(`SELECT * FROM orders WHERE id = $1`, [orderId]),
+              catch: () => new DbError({ orderId }),
+            })
+            const receipt = yield* Effect.tryPromise({
+              try: () => processPayment(order),
+              catch: () => new ProcessingError({ orderId }),
+            })
+            yield* Effect.promise(() => cache.set(`receipt:${orderId}`, receipt))
+            return receipt
+          })
+        )
+      )
+    ),
+    Effect.scoped
+  )
+```
+
+**Comparison:** Effect's `acquireRelease` + `Effect.scoped` provides the same guarantee — resources are always cleaned up. But it requires wrapping everything in the Effect system: `Effect.flatMap`, `Effect.gen`, `yield*`, and `Effect.scoped`. errore uses native `await using` + `DisposableStack` — the same cleanup guarantee with plain async/await.
+
+---
+
+## 6. From Effect.ts: React Server Component
 
 A React server component that fetches a video with policy checks, handles password-protected videos, private videos, and missing videos — each with distinct UI.
 

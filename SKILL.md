@@ -45,7 +45,6 @@ console.log(user.name)                  // TypeScript knows: User
 These TypeScript practices complement errore's philosophy:
 
 - **Object args over positional** — `({id, retries})` not `(id, retries)` for functions with 2+ params
-- **Block body on arrow functions** — `(x) => { return x }` not `(x) => x`, easier to add statements later
 - **Expressions over statements** — use IIFEs, ternaries, `.map`/`.filter` instead of `let` + mutation
 - **Early returns** — check and return at top, don't nest. Combine conditions: `if (a && b)` not `if (a) { if (b) }`
 - **No `any`** — search for proper types, use `as unknown as T` only as last resort
@@ -444,6 +443,71 @@ return res.status(response.status).json(response.body)
 
 > `matchError` routes by `_tag` and requires an `Error` fallback for plain Error instances. Use `matchErrorPartial` when you only need to handle some cases.
 
+### Resource Cleanup (defer)
+
+errore ships `DisposableStack` and `AsyncDisposableStack` polyfills that work in every runtime. Use them with TypeScript's `using` / `await using` for Go-like `defer` cleanup.
+
+**tsconfig requirement:** add `"ESNext.Disposable"` to `lib` so TypeScript knows about `Disposable`, `AsyncDisposable`, `using`, and `await using`:
+
+```jsonc
+{
+  "compilerOptions": {
+    "lib": ["ES2022", "ESNext.Disposable"]
+  }
+}
+```
+
+Without this, `using`/`await using` declarations and `Symbol.dispose`/`Symbol.asyncDispose` will produce type errors. The errore polyfill handles the runtime side — this setting handles the type side.
+
+<!-- bad -->
+```ts
+async function processRequest(id: string) {
+  const db = await connectDb()
+  try {
+    const cache = await openCache()
+    try {
+      // ... use db and cache ...
+      return result
+    } finally {
+      await cache.flush()
+    }
+  } finally {
+    await db.close()
+  }
+}
+```
+
+<!-- good -->
+```ts
+import * as errore from 'errore'
+
+async function processRequest(id: string): Promise<DbError | Result> {
+  await using cleanup = new errore.AsyncDisposableStack()
+
+  const db = await errore.tryAsync({
+    try: () => connectDb(),
+    catch: (e) => new DbError({ cause: e }),
+  })
+  if (db instanceof Error) return db
+  cleanup.defer(() => db.close())
+
+  const cache = await errore.tryAsync({
+    try: () => openCache(),
+    catch: (e) => new CacheError({ cause: e }),
+  })
+  if (cache instanceof Error) return cache
+  cleanup.defer(() => cache.flush())
+
+  // ... use db and cache ...
+  return result
+  // cleanup runs automatically in LIFO order:
+  // 1. cache.flush()
+  // 2. db.close()
+}
+```
+
+> `await using` guarantees cleanup runs when the scope exits — whether by return, early error return, or thrown exception. Resources are released in reverse order (LIFO), just like Go's `defer`. No `try/finally` nesting.
+
 ### Fallback Values
 
 <!-- bad -->
@@ -635,7 +699,7 @@ for (const id of ids) {
 const allResults = await Promise.all(ids.map((id) => fetchItem(id)))
 const [items, errors] = errore.partition(allResults)
 
-errors.forEach((e) => { console.warn('Failed:', e.message) })
+errors.forEach((e) => console.warn('Failed:', e.message))
 // items contains only successful results, fully typed
 ```
 
@@ -792,6 +856,15 @@ errore.matchError(err, {
 
 ```ts
 import * as errore from 'errore'
+
+// --- Resource cleanup (Go-like defer) ---
+await using cleanup = new errore.AsyncDisposableStack()
+cleanup.defer(() => db.close())     // runs on scope exit, LIFO order
+cleanup.defer(() => cache.flush())  // this runs first (last in, first out)
+
+// sync version
+using cleanup = new errore.DisposableStack()
+cleanup.defer(() => file.closeSync())
 
 // --- Define errors ---
 class MyError extends errore.createTaggedError({

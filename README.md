@@ -390,6 +390,54 @@ const posts = errore.andThen(user, u => fetchPosts(u.id))
 const logged = errore.tap(user, u => console.log('Got user:', u.name))
 ```
 
+### Resource Cleanup (defer)
+
+errore ships `DisposableStack` and `AsyncDisposableStack` polyfills for Go-like `defer` cleanup. Works in every runtime — no native `DisposableStack` support needed:
+
+```ts
+import * as errore from 'errore'
+
+async function processRequest(id: string): Promise<DbError | Result> {
+  // await using = cleanup runs automatically when scope exits
+  await using cleanup = new errore.AsyncDisposableStack()
+
+  const db = await connectDb()
+  cleanup.defer(() => db.close())
+
+  const cache = await openCache()
+  cleanup.defer(() => cache.flush())
+
+  // ... use db and cache ...
+  return result
+  // cleanup runs in LIFO order: cache.flush() → db.close()
+}
+```
+
+Resources are released in **reverse order** (last deferred = first cleaned up), just like Go's `defer`. Cleanup runs on normal return, early error return, or thrown exception.
+
+```ts
+// Sync version with using
+function readConfig(path: string): ParseError | Config {
+  using cleanup = new errore.DisposableStack()
+
+  const file = openFileSync(path)
+  cleanup.defer(() => file.closeSync())
+
+  const lock = acquireLock(path)
+  cleanup.defer(() => lock.release())
+
+  return parseConfig(file.readSync())
+}
+```
+
+You can also register existing `Disposable` objects directly:
+
+```ts
+await using cleanup = new errore.AsyncDisposableStack()
+cleanup.use(dbConnection)   // calls dbConnection[Symbol.dispose]() on exit
+cleanup.adopt(handle, (h) => h.close())  // custom cleanup for non-disposable values
+```
+
 ### Extraction
 
 **Extract values** or throw, **split arrays** by success/error:
@@ -684,6 +732,8 @@ Effect is powerful if you need its full feature set. But if you just want type-s
 | Learning curve | Steep (new paradigm) | Minimal (just `instanceof`) |
 | Codebase impact | Pervasive (everything becomes an Effect) | Surgical (adopt incrementally) |
 | Bundle size | ~50KB+ | **~0 bytes** |
+| Resource cleanup | `Scope` + `addFinalizer` + `acquireRelease` | `using` + `DisposableStack.defer()` |
+| Cancellation | Fiber interruption model | Native `AbortController` |
 | Use case | Full FP framework | Just error handling |
 
 **Use Effect** when you want dependency injection, structured concurrency, and the full functional programming experience.
