@@ -1,0 +1,4 @@
+node_modules
+.next
+.vercel
+.DS_Store

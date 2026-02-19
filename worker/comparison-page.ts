@@ -222,8 +222,7 @@ function getStyles(): string {
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--fg-muted);
-      max-width: 700px;
-      margin: 2rem auto 0;
+      margin: 2rem 0 0;
       padding-top: 2rem;
       border-top: 1px solid var(--border);
     }

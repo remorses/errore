@@ -1,0 +1,1010 @@
+import { SideBySide } from '../components/SideBySide'
+import { TableOfContents } from '../components/TableOfContents'
+
+# Remix for Next.js Developers
+
+> Do you like this guide? If yes you may want to reserve a spot for the [Remix for Next Devs Video Course](https://holocron.lemonsqueezy.com/buy/e601a66b-9e3c-4e52-8a4e-1d95d49bae3b?logo=0) where we will create a full Remix application from scratch using Remix, Tailwind, Supabase, Docker and Fly.
+
+**Table of Contents**
+
+<TableOfContents tableOfContents={tableOfContents} />
+
+## Routes definition
+
+Instead of using folders and slashes to define routes, you can use dots (`.`) to define routes, each dot define a path segment.
+
+<SideBySide>
+
+```bash
+pages/
+├── _app.tsx
+├── index.tsx
+├── about.tsx
+├── concerts/
+│   ├── index.tsx
+│   ├── trending.tsx
+│   └── [city].tsx
+```
+
+```bash
+app/
+├── routes/
+│   ├── _index.tsx
+│   ├── about.tsx
+│   ├── concerts._index.tsx
+│   ├── concerts.$city.tsx
+│   ├── concerts.trending.tsx
+│   └── concerts.tsx
+└── root.tsx
+```
+
+</SideBySide>
+
+## Dynamic route `[city].tsx`
+
+Instead of using square brackets to define dynamic routes, you can use the dollar sign with your param name (`$city`) to define dynamic routes.
+
+<SideBySide>
+
+```bash
+pages/
+├── _app.tsx
+├── concerts/
+│   ├── index.tsx
+# focus
+│   └── [city].tsx
+```
+
+```bash
+app/
+├── routes/
+│   ├── concerts._index.tsx
+# focus
+│   ├── concerts.$city.tsx
+└── root.tsx
+```
+
+</SideBySide>
+
+## Catch all routes `[...slug].tsx`
+
+Instead of using three dots to define catch all routes, you can use the dollar sign (`$`) to define catch all routes.
+
+<SideBySide>
+
+```bash
+pages/
+├── _app.tsx
+├── posts/
+# focus
+│   ├── [...slug].tsx
+│   └── index.tsx
+```
+
+```bash
+app/
+├── routes/
+# focus
+│   ├── posts.$.tsx
+│   └── posts._index.tsx
+└── root.tsx
+```
+
+</SideBySide>
+
+## Route groups (app directory)
+
+Route groups exist in Next.js app directory, Remix has them too, if a route starts with a underscore it will be used as an hidden route, useful to define a layout for a set of routes.
+
+<SideBySide>
+
+```bash
+app/
+# focus(1:6)
+├── (group)/
+│   ├── folder/
+│   │   ├── page.tsx
+│   │   └── layout.tsx
+│   ├── page.tsx
+│   └── layout.tsx
+├── other/
+│   └── page.tsx
+├── layout.tsx
+```
+
+```bash
+app/
+├── routes/
+# focus(1:3)
+│   ├── _group.tsx
+│   ├── _group._index.tsx
+│   ├── _group.folder.tsx
+│   └── other.tsx
+└── root.tsx
+```
+
+</SideBySide>
+
+## Routes with dots (sitemap.xml)
+
+You can escape dots in Remix with `[]` syntax. This is useful for characters like `.` and `_` that have special meaning in the route syntax.
+
+<SideBySide>
+
+```bash
+pages/
+├── _app.tsx
+├── posts/
+│   ├── index.tsx
+│   └── about.tsx
+# focus
+├── sitemap.xml.tsx
+```
+
+```bash
+app/
+├── routes/
+│   ├── posts._index.tsx
+│   ├── posts.about.tsx
+# focus
+│   └── sitemap[.xml].tsx
+└── root.tsx
+```
+
+</SideBySide>
+
+## `_document.tsx`
+
+In Remix, the equivalent of `_document.tsx` in Next.js is `root.tsx`.
+
+<SideBySide>
+
+```tsx
+// /pages/_document.tsx
+import { Html, Head, Main, NextScript } from 'next/document'
+
+export default function Document() {
+    return (
+        <Html lang='en'>
+            <Head />
+            <body>
+                <Main />
+                <NextScript />
+            </body>
+        </Html>
+    )
+}
+```
+
+```tsx
+// app/root.tsx
+
+import {
+    Links,
+    Meta,
+    Outlet,
+    Scripts,
+    ScrollRestoration,
+} from '@remix-run/react'
+
+export default function Root() {
+    return (
+        <html lang='en'>
+            <head>
+                <Links />
+                <Meta />
+            </head>
+            <body>
+                <Outlet />
+                <ScrollRestoration />
+                <Scripts />
+            </body>
+        </html>
+    )
+}
+```
+
+</SideBySide>
+
+## Layouts (app directory)
+
+In Remix, you can define layouts in the `app` directory, the equivalent of `_app.tsx` in Next.js is `root.tsx`. Each route folder can have a layout too, simply define a component for that folder and use Outlet to render the child routes.
+
+<SideBySide>
+
+```tsx
+// app/posts/layout.tsx
+export default function Layout({ children }) {
+    return <div>{children}</div>
+}
+
+// app/posts/[id]/page.tsx
+export default function Page() {
+    return <div>Hello World</div>
+}
+```
+
+```tsx
+import { Outlet } from '@remix-run/react'
+
+// app/routes/posts.tsx
+export default function Layout() {
+    return (
+        <div>
+            <Outlet />
+        </div>
+    )
+}
+// app/routes/posts.$id.tsx
+export default function Page() {
+    return <div>Hello World</div>
+}
+```
+
+</SideBySide>
+
+## `getServerSideProps`
+
+Remix has `loader` instead of `getServerSideProps`, the `loader` function is a top-level export in a route module that is used to fetch data for the route. This function is called on every render, on client side navigation this function will be used to get the json for the next page.
+
+<SideBySide>
+
+```tsx
+// /pages/index.tsx
+export async function getServerSideProps() {
+    const data = await fetchData()
+    return { props: { data } }
+}
+
+const Page = ({ data }) => <div>{data}</div>
+
+export default Page
+```
+
+```tsx
+// /routes/index.tsx
+import { LoaderFunction, json } from '@remix-run/node'
+import { useLoaderData } from '@remix-run/react'
+
+export let loader: LoaderFunction = async (request) => {
+    const data = await fetchData()
+    return json(data)
+}
+
+export default function Index() {
+    let data = useLoaderData<typeof loader>()
+    return <div>{data}</div>
+}
+```
+
+</SideBySide>
+
+## `getServerSideProps` with redirect
+
+Remix has an utility function called `redirect` you can return in your loaders, notice that this function simply returns a Response.
+
+<SideBySide>
+
+```tsx
+export async function getServerSideProps() {
+    return {
+        redirect: {
+            destination: '/home',
+            permanent: false,
+        },
+    }
+}
+```
+
+```tsx
+import { LoaderFunction, redirect } from '@remix-run/node'
+
+export let loader: LoaderFunction = async () => {
+    return redirect('/home', { status: 307 })
+}
+```
+
+</SideBySide>
+
+## `getServerSideProps` notFound
+
+Remix supports throwing responses, similar to what Next.js app directory does, when you throw a response you can intercept it in a route `ErrorBoundary` to show a custom message.
+
+<SideBySide>
+
+```tsx
+export async function getServerSideProps() {
+    return {
+        notFound: true,
+    }
+}
+```
+
+```tsx
+import { LoaderFunction } from '@remix-run/node'
+
+export let loader: LoaderFunction = async () => {
+    throw new Response('', { status: 404 })
+}
+```
+
+</SideBySide>
+
+## API Routes
+
+Remix has no concept of API routes, just use normal loaders like any other route and return a Response object.
+
+<SideBySide>
+
+```tsx
+// /pages/api/hello.ts
+import { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse,
+) {
+    res.status(200).json({ name: 'John Doe' })
+}
+```
+
+```tsx
+// /routes/api/hello.ts
+import { LoaderFunctionArgs, LoaderFunction } from '@remix-run/node'
+
+// focus(1:3)
+export let loader = async ({ request }: LoaderFunctionArgs) => {
+    const res = new Response(JSON.stringify({ name: 'John Doe' }))
+    return res
+}
+```
+
+</SideBySide>
+
+## `useRouter().push`
+
+Remix instead of `useRouter` has many little hooks unfortunately. One of these is `useNavigate` which is used to navigate to a new route.
+
+<SideBySide>
+
+```tsx
+import { useRouter } from 'next/router'
+export default function Index() {
+    // focus
+    const router = useRouter()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                router.push('/home')
+            }}
+        >
+            Home
+        </button>
+    )
+}
+```
+
+```tsx
+import { useNavigate } from '@remix-run/react'
+
+export default function Index() {
+    // focus
+    const navigate = useNavigate()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                navigate('/home')
+            }}
+        >
+            Home
+        </button>
+    )
+}
+```
+
+</SideBySide>
+
+## `useRouter().replace`
+
+Remix uses navigate with a second options argument.
+
+<SideBySide>
+
+```tsx
+import { useRouter } from 'next/router'
+
+export default function Index() {
+    // focus
+    const router = useRouter()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                router.replace('/home')
+            }}
+        >
+            Home
+        </button>
+    )
+}
+```
+
+```tsx
+import { useNavigate } from '@remix-run/react'
+
+export default function Index() {
+    // focus
+    const navigate = useNavigate()
+
+    return (
+        // focus
+        <button
+            onClick={() => {
+                // focus
+                navigate('/home', { replace: true })
+            }}
+        >
+            Home
+        </button>
+    )
+}
+```
+
+</SideBySide>
+
+## `useRouter().reload()`
+
+In Next.js you can reload with `router.reload()` or `router.replace(router.asPath)`. In Remix you can use `revalidate` from `useRevalidator`.
+
+> In Remix revalidate loading state is not the same as `useNavigation.state`, this means if you want to create a progress bar at the top of the page you will also need to use this revalidator state too to show the loading bar during reloads or form submits.
+
+<SideBySide>
+
+```tsx
+import { useRouter } from 'next/router'
+
+export default function Index() {
+    // focus
+    const router = useRouter()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                router.reload()
+            }}
+        >
+            Reload
+        </button>
+    )
+}
+```
+
+```tsx
+import { useRevalidator } from '@remix-run/react'
+export default function Index() {
+    // focus
+    const { revalidate } = useRevalidator()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                revalidate()
+            }}
+        >
+            Reload
+        </button>
+    )
+}
+```
+
+</SideBySide>
+
+## `useRouter().query`
+
+To access query parameters in Remix, you can use the `useSearchParams` hook.
+
+> Remix will **not** pass params in this object, unlike Next.js.
+
+<SideBySide>
+
+```tsx
+import { useRouter } from 'next/router'
+
+export default function Index() {
+    // focus
+    const router = useRouter()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                router.replace({ query: { ...router.query, name: 'John Doe' } })
+            }}
+        >
+            {router.query.name}
+        </button>
+    )
+}
+```
+
+```tsx
+import { useSearchParams } from '@remix-run/react'
+export default function Index() {
+    // focus
+    const [searchParams, setSearchParams] = useSearchParams()
+
+    return (
+        <button
+            onClick={() =>
+                // focus(1:4)
+                setSearchParams((prev) => {
+                    prev.set('name', 'John Doe')
+                    return prev
+                })
+            }
+        >
+            // focus
+            {searchParams.get('name')}
+        </button>
+    )
+}
+```
+
+</SideBySide>
+
+## `useRouter().asPath`
+
+Next.js has `asPath` to get the current path as shown in the browser. Remix has `useLocation`, which returns an object similar to the window.location object.
+
+<SideBySide>
+
+```tsx
+import { useRouter } from 'next/router'
+
+export default function Index() {
+    // focus
+    const router = useRouter()
+
+    // focus
+    return <div>{router.asPath}</div>
+}
+```
+
+```tsx
+import { useLocation } from '@remix-run/react'
+
+export default function Index() {
+    // focus
+    const location = useLocation()
+
+    // focus
+    return <div>{location.pathname}</div>
+}
+```
+
+</SideBySide>
+
+## `useRouter().back()`
+
+Remix uses the navigate function to go back in the history stack.
+
+<SideBySide>
+
+```tsx
+import { useRouter } from 'next/router'
+
+export default function Index() {
+    const router = useRouter()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                router.back()
+            }}
+        >
+            Back
+        </button>
+    )
+}
+```
+
+```tsx
+import { useNavigate } from '@remix-run/react'
+
+export default function Index() {
+    // focus
+    const navigate = useNavigate()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                navigate(-1)
+            }}
+        >
+            Back
+        </button>
+    )
+}
+```
+
+</SideBySide>
+
+## `useRouter().forward()`
+
+Remix uses the navigate function to go forward in the history stack.
+
+<SideBySide>
+
+```tsx
+import { useRouter } from 'next/router'
+
+export default function Index() {
+    // focus
+    const router = useRouter()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                router.forward()
+            }}
+        >
+            Forward
+        </button>
+    )
+}
+```
+
+```tsx
+import { useNavigate } from '@remix-run/react'
+
+export default function Index() {
+    // focus
+    const navigate = useNavigate()
+
+    return (
+        <button
+            onClick={() => {
+                // focus
+                navigate(1)
+            }}
+        >
+            Forward
+        </button>
+    )
+}
+```
+
+</SideBySide>
+
+## dynamic params
+
+Dynamic params in Remix can be accessed both in the loaders and with an hook useParams.
+
+<SideBySide>
+
+```tsx
+import { useRouter } from 'next/router'
+
+// focus(1:3)
+export function getServerSideProps({ params }) {
+    return { props: { params } }
+}
+
+export default function Index({ params }) {
+    // focus
+    const router = useRouter()
+
+    return (
+        <div>
+            // focus
+            {params.name} is same as {router.query.name}
+        </div>
+    )
+}
+```
+
+```tsx
+import { LoaderFunctionArgs, json } from '@remix-run/node'
+import { useParams } from '@remix-run/react'
+
+// focus(1:3)
+export function loader({ params }: LoaderFunctionArgs) {
+    return json({ params })
+}
+
+export default function Index() {
+    // focus
+    const params = useParams()
+
+    // focus
+    return <div>{params.name}</div>
+}
+```
+
+</SideBySide>
+
+## `getStaticProps`
+
+Remix does not have a direct equivalent to `getStaticProps`, but you can use `loader` with a `stale-while-revalidate` cache control header to achieve the same behavior. You will also need a CDN on top of your host to support this feature the same way Next.js on Vercel does.
+
+One drawback is that you can't create the pages ahead of time to have them fast on the first load.
+
+<SideBySide>
+
+```tsx
+// focus(1:3)
+export function getStaticProps({ params }) {
+    return { props: { params } }
+}
+
+// focus
+export const revalidate = 60
+
+export default function Index({ params }) {
+    return <div>{params.name}</div>
+}
+```
+
+```tsx
+import { LoaderFunctionArgs, json } from '@remix-run/node'
+import { useLoaderData } from '@remix-run/react'
+
+// focus(1:11)
+export function loader({ params }: LoaderFunctionArgs) {
+    return json(
+        { params },
+        {
+            headers: {
+                // you will need a CDN on top
+                'Cache-Control': 'public, stale-while-revalidate=60',
+            },
+        },
+    )
+}
+
+export default function Index() {
+    const data = useLoaderData<typeof loader>()
+
+    return <div>{data.params.name}</div>
+}
+```
+
+</SideBySide>
+
+## `_error.jsx`
+
+Remix can have an error boundary for each route, this error boundary will be rendered when you throw an error in a loader or during rendering
+
+<SideBySide>
+
+```tsx
+// focus(1:9)
+function Error({ statusCode }) {
+    return (
+        <p>
+            {statusCode
+                ? `An error ${statusCode} occurred on server`
+                : 'An error occurred on client'}
+        </p>
+    )
+}
+
+Error.getInitialProps = ({ res, err }) => {
+    const statusCode = res ? res.statusCode : err ? err.statusCode : 404
+    return { statusCode }
+}
+
+export default Error
+```
+
+```tsx
+import { useRouteError, Scripts, isRouteErrorResponse } from '@remix-run/react'
+
+// root.tsx
+// focus(1:19)
+export function ErrorBoundary() {
+    const error = useRouteError()
+    return (
+        <html>
+            <head>
+                <title>Oops!</title>
+            </head>
+            <body>
+                <h1>
+                    {isRouteErrorResponse(error)
+                        ? `${error.status} ${error.statusText}`
+                        : error instanceof Error
+                          ? error.message
+                          : 'Unknown Error'}
+                </h1>
+                <Scripts />
+            </body>
+        </html>
+    )
+}
+```
+
+</SideBySide>
+
+## `400.jsx`
+
+Remix does not have a special file for 400 errors, you can use the error boundary to show a custom message for 400 errors.
+
+> Notice that the same Remix `ErrorBoundary` used for runtime errors is also called for 404 errors, you can check if the error is a response error to show a not found message.
+
+<SideBySide>
+
+```tsx
+// pages/400.jsx
+
+export default function Custom404() {
+    return <h1>404 - Page Not Found</h1>
+}
+```
+
+```tsx
+// root.tsx
+import { useRouteError, Scripts, isRouteErrorResponse } from '@remix-run/react'
+
+// a 404 page is the same thing as an error page, where the error is a 404 response
+export function ErrorBoundary() {
+    const error = useRouteError()
+    return (
+        <html>
+            <head>
+                <title>Oops!</title>
+            </head>
+            <body>
+                <h1>
+                    {isRouteErrorResponse(error)
+                        ? `${error.status} ${error.statusText}`
+                        : error instanceof Error
+                          ? error.message
+                          : 'Unknown Error'}
+                </h1>
+                <Scripts />
+            </body>
+        </html>
+    )
+}
+```
+
+</SideBySide>
+
+## `useRouter().events`
+
+Next.js pages directory has router events, perfect to show progress bar at the top of the screen. Remix can do the same thing with the `useNavigation` hook.
+
+<SideBySide>
+
+```tsx
+import { useRouter } from 'next/router'
+import { useEffect, useState } from 'react'
+
+export default function Index() {
+    const router = useRouter()
+
+    const [isNavigating, setIsNavigating] = useState(false)
+    useEffect(() => {
+        router.events.on('routeChangeStart', () => setIsNavigating(true))
+        router.events.on('routeChangeComplete', () => setIsNavigating(false))
+        router.events.on('routeChangeError', () => setIsNavigating(false))
+    }, [router.events])
+
+    return <div>{isNavigating ? 'Navigating...' : 'Not navigating'}</div>
+}
+```
+
+```tsx
+import { useNavigation } from '@remix-run/react'
+
+export default function Index() {
+    // focus
+    const { state } = useNavigation()
+
+    // focus
+    return <div>{state === 'loading' ? 'Navigating...' : 'Not navigating'}</div>
+}
+```
+
+</SideBySide>
+
+## Showing skeleton while loading (app directory)
+
+Next.js support streaming when using the app directory and server components, when you fetch a page you get the suspense fallback first while the browser streams the rest of the page and React injects script tags at the end to replace the fallbacks with the real components.
+
+Remix can do the same, using the defer utility function. You pass unresolved promises and Remix can start render the page and replace the fallbacks with the rendered components later on time.
+
+<SideBySide>
+
+```tsx
+// app/page.tsx using server components
+import { Suspense } from 'react'
+
+// focus(1:4)
+async function ServerComponent() {
+    const data = await fetchData()
+    return <div>{data}</div>
+}
+
+export default function Page() {
+    return (
+        // focus
+        <Suspense fallback={<div>Loading...</div>}>
+            <ServerComponent />
+        </Suspense>
+    )
+}
+```
+
+```tsx
+import { defer } from '@remix-run/node'
+import { useLoaderData, Await } from '@remix-run/react'
+import { Suspense } from 'react'
+
+// focus(1:5)
+export function loader() {
+    return defer({
+        data: fetchData(),
+    })
+}
+
+export default function Page() {
+    const { data } = useLoaderData<typeof loader>()
+    return (
+        // focus(1:3)
+        <Suspense fallback={<div>Loading...</div>}>
+            <Await resolve={data}>{(data) => <div>{data}</div>}</Await>
+        </Suspense>
+    )
+}
+```
+
+</SideBySide>
+
+## Dynamic imports
+
+Remix supports the React.lazy function to load components dynamically.
+
+<SideBySide>
+
+```tsx
+import dynamic from 'next/dynamic'
+
+// focus(1:3)
+const Page = dynamic(() => import('./page'), {
+    loading: () => <div>Loading...</div>,
+})
+
+export default function App() {
+    return <Page />
+}
+```
+
+```tsx
+import { lazy, Suspense } from 'react'
+
+// focus
+const Page = lazy(() => import('./page'))
+
+export default function App() {
+    return (
+        // focus(1:3)
+        <Suspense fallback={<div>Loading...</div>}>
+            <Page />
+        </Suspense>
+    )
+}
+```
+
+</SideBySide>
