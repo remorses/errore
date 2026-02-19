@@ -156,12 +156,19 @@ describe('DisposableStack', () => {
       stack[Symbol.dispose]()
     } catch (e: any) {
       // LIFO: 'second-deferred' runs first, 'first-deferred' runs second.
-      // The final thrown error wraps 'first-deferred' (latest) with
-      // 'second-deferred' (previous) as cause.
+      // SuppressedError wraps both: .error is first-deferred (latest),
+      // .suppressed is second-deferred (previous).
       expect(e).toBeInstanceOf(Error)
-      expect(e.message).toContain('first-deferred')
-      expect(e.cause).toBeInstanceOf(Error)
-      expect((e.cause as Error).message).toContain('second-deferred')
+      if ('error' in e) {
+        // Native SuppressedError
+        expect(e.error.message).toContain('first-deferred')
+        expect(e.suppressed.message).toContain('second-deferred')
+      } else {
+        // Fallback: cause chain
+        expect(e.message).toContain('first-deferred')
+        expect(e.cause).toBeInstanceOf(Error)
+        expect((e.cause as Error).message).toContain('second-deferred')
+      }
     }
   })
 
