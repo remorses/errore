@@ -1,6 +1,7 @@
 // Server-side syntax highlighting using @code-hike/lighter.
 // Parses focus annotations (// !focus, # !focus) from code comments,
 // highlights with lighter, and renders to HTML strings with focus dimming.
+// Renders both light and dark themes, toggled via CSS prefers-color-scheme.
 
 import { highlight as lighterHighlight } from '@code-hike/lighter'
 
@@ -55,22 +56,12 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;')
 }
 
-/**
- * Highlight code and render to an HTML string.
- * Returns a <pre><code> block with inline styles from the theme.
- * If focus annotations are present, unfocused lines get dimmed.
- */
-export async function highlightCode(
-  code: string,
-  lang: string = 'typescript',
-  theme: string = 'github-dark',
-): Promise<string> {
-  const { cleanedCode, focusedLines } = parseFocusAnnotations(code)
-  const hasFocus = focusedLines.size > 0
-
-  const { lines, style } = await lighterHighlight(cleanedCode, lang, theme)
-
-  const linesHtml = lines
+function renderLines(
+  lines: { style?: { color?: string }; content: string }[][],
+  focusedLines: Set<number>,
+  hasFocus: boolean,
+): string {
+  return lines
     .map((tokens, lineIndex) => {
       const isFocused = focusedLines.has(lineIndex)
       const lineClass = hasFocus
@@ -92,9 +83,31 @@ export async function highlightCode(
       return `<span class="${lineClass}">${tokensHtml}\n</span>`
     })
     .join('')
+}
 
-  const bg = style?.background || '#24292e'
-  const fg = style?.color || '#e1e4e8'
+/**
+ * Highlight code and render to an HTML string.
+ * Renders both light and dark variants, toggled via CSS.
+ * If focus annotations are present, unfocused lines get dimmed.
+ */
+export async function highlightCode(
+  code: string,
+  lang: string = 'typescript',
+): Promise<string> {
+  const { cleanedCode, focusedLines } = parseFocusAnnotations(code)
+  const hasFocus = focusedLines.size > 0
+  const focusClass = hasFocus ? ' ch-has-focus' : ''
 
-  return `<pre class="ch-pre${hasFocus ? ' ch-has-focus' : ''}" style="background:${bg};color:${fg}"><code>${linesHtml}</code></pre>`
+  const [dark, light] = await Promise.all([
+    lighterHighlight(cleanedCode, lang, 'github-dark'),
+    lighterHighlight(cleanedCode, lang, 'github-light'),
+  ])
+
+  const darkHtml = renderLines(dark.lines, focusedLines, hasFocus)
+  const lightHtml = renderLines(light.lines, focusedLines, hasFocus)
+
+  const darkFg = dark.style?.color || '#e1e4e8'
+  const lightFg = light.style?.color || '#24292e'
+
+  return `<pre class="ch-pre ch-dark${focusClass}" style="background:var(--bg);color:${darkFg}"><code>${darkHtml}</code></pre><pre class="ch-pre ch-light${focusClass}" style="background:var(--bg);color:${lightFg}"><code>${lightHtml}</code></pre>`
 }

@@ -163,7 +163,7 @@ function getStyles(): string {
 
     /* Header */
     .page-header {
-      max-width: 1400px;
+      max-width: 1000px;
       margin: 0 auto;
       padding: 3rem 2rem 2rem;
       text-align: center;
@@ -194,7 +194,7 @@ function getStyles(): string {
 
     /* Main */
     main {
-      max-width: 1400px;
+      max-width: 1000px;
       margin: 0 auto;
       padding: 1rem 2rem 4rem;
     }
@@ -204,10 +204,27 @@ function getStyles(): string {
       margin-bottom: 4rem;
     }
 
+    /* Group headings (h1 sections with no code blocks) */
+    .comparison-section > h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--fg-muted);
+      max-width: 700px;
+      margin: 2rem auto 0;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+    .comparison-section:first-child > h1 {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
     /* Prose */
     .comparison-prose {
-      max-width: 700px;
-      margin: 0 auto 1.5rem;
+      margin: 0 0 1.5rem;
     }
     .comparison-prose h2 {
       font-size: 1.5rem;
@@ -265,14 +282,20 @@ function getStyles(): string {
       margin-bottom: 0.5rem;
     }
 
-    /* Code blocks */
+    /* Code blocks — light/dark toggle */
+    .ch-pre.ch-dark { display: none; }
+    .ch-pre.ch-light { display: block; }
+    @media (prefers-color-scheme: dark) {
+      .ch-pre.ch-dark { display: block; }
+      .ch-pre.ch-light { display: none; }
+    }
     .ch-pre {
       border-radius: 8px;
-      padding: 1.25rem 1.5rem;
+      padding: 0;
       overflow-x: auto;
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 0.8125rem;
-      border: 1px solid var(--code-border);
+      font-size: 0.75rem;
+      border: none;
     }
     .ch-pre code {
       font-family: inherit;
@@ -283,7 +306,7 @@ function getStyles(): string {
       transition: opacity 0.15s ease;
     }
     .ch-has-focus .ch-line {
-      opacity: 0.4;
+      opacity: 0.65;
     }
     .ch-has-focus .ch-line.ch-focused {
       opacity: 1;
@@ -291,7 +314,7 @@ function getStyles(): string {
 
     /* Footer */
     .page-footer {
-      max-width: 1400px;
+      max-width: 1000px;
       margin: 0 auto;
       padding: 2rem;
       text-align: center;
