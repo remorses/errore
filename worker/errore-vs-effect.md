@@ -45,7 +45,7 @@ Effect tracks three type parameters for every operation. errore uses a plain uni
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:6)
+// !focus(1:10)
 //         ┌── success
 //         │      ┌── error
 //         │      │         ┌── dependencies
@@ -67,14 +67,14 @@ function getUser(
 ```
 
 ```typescript
-// !focus(1:4)
+// !focus(1:5)
 // Just a union: Error | Value
 // No extra type parameters
 function getUser(
   id: string
 ): Promise<NotFoundError | NetworkError | User>
 
-// !focus(1:3)
+// !focus(1:5)
 // The return type tells the full story
 const user = await getUser(id)
 if (user instanceof NotFoundError) { /* ... */ }
@@ -91,7 +91,7 @@ Every Effect program must be executed through a runtime. errore returns plain va
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:3)
+// !focus(1:6)
 // Nothing runs until you call a runner
 const program = Effect.gen(function* () {
   const user = yield* fetchUser(id)
@@ -138,7 +138,7 @@ function getUser(id: string) {
   })
 }
 
-// !focus(1:5)
+// !focus(1:7)
 const result = Effect.runSync(
   getUser('123').pipe(
     Effect.catchTag('NotFoundError', (e) =>
@@ -180,7 +180,7 @@ Selectively recovering from specific error types while letting others propagate.
 import { Effect } from 'effect'
 
 // catchTag — handle one specific error
-// !focus(1:6)
+// !focus(1:7)
 const program = fetchUser(id).pipe(
   Effect.catchTag('NotFoundError', (e) =>
     Effect.succeed(
@@ -191,7 +191,7 @@ const program = fetchUser(id).pipe(
 // NetworkError still propagates
 
 // catchTags — handle multiple error types
-// !focus(1:8)
+// !focus(1:10)
 const handled = fetchUser(id).pipe(
   Effect.catchTags({
     NotFoundError: (e) =>
@@ -227,7 +227,7 @@ Exhaustive handling of all error cases.
 import { Effect, Match } from 'effect'
 
 const program = fetchUser(id).pipe(
-  // !focus(1:8)
+  // !focus(1:11)
   Effect.catchAll((error) =>
     Match.value(error).pipe(
       Match.tag('NotFoundError', (e) =>
@@ -350,7 +350,7 @@ Trying multiple strategies in sequence, falling back on failure.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:9)
+// !focus(1:10)
 const program = fetchFromCache(id).pipe(
   Effect.orElse(() => fetchFromDb(id)),
   Effect.orElse(() => fetchFromApi(id)),
@@ -366,7 +366,7 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-// !focus(1:7)
+// !focus(1:8)
 const cache = await fetchFromCache(id)
 if (!(cache instanceof Error)) return cache
 
@@ -403,7 +403,7 @@ const program = Effect.forEach(
 )
 
 // Or partition with Effect.partition
-// !focus(1:6)
+// !focus(1:7)
 const [errors, users] = await Effect.runPromise(
   Effect.partition(
     userIds,
@@ -424,7 +424,7 @@ const results = await Promise.all(
 const [users, errors] = errore.partition(results)
 // users: User[], errors: Error[]
 
-// !focus(1:2)
+// !focus(1:3)
 errors.forEach((e) =>
   console.warn('Failed:', e.message)
 )
@@ -510,7 +510,7 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-// !focus(1:8)
+// !focus(1:10)
 async function fetchWithRetry(
   id: string
 ): Promise<NetworkError | User> {
@@ -537,7 +537,7 @@ Retrying until a specific error condition is met, with different handling for th
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:7)
+// !focus(1:8)
 const program = Effect.retry(
   fetchUser(id),
   {
@@ -548,7 +548,7 @@ const program = Effect.retry(
 )
 
 // Or with retryOrElse for a fallback
-// !focus(1:7)
+// !focus(1:8)
 const withFallback = Effect.retryOrElse(
   fetchUser(id),
   Schedule.recurs(3),
@@ -562,7 +562,7 @@ await Effect.runPromise(withFallback)
 ```
 
 ```typescript
-// !focus(1:10)
+// !focus(1:11)
 async function fetchWithRetry(
   id: string
 ): Promise<NotFoundError | NetworkError | User> {
@@ -576,7 +576,7 @@ async function fetchWithRetry(
 }
 
 // Or with a fallback on exhaustion
-// !focus(1:3)
+// !focus(1:4)
 const user = await fetchWithRetry(id)
 const result = user instanceof Error
   ? { name: 'guest', id: 'unknown' }
@@ -592,7 +592,7 @@ Aborting an operation if it takes too long and returning a typed error.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:8)
+// !focus(1:9)
 const program = fetchUser(id).pipe(
   Effect.timeoutFail({
     duration: '5 seconds',
@@ -604,7 +604,7 @@ const program = fetchUser(id).pipe(
 )
 
 // The error channel now includes TimeoutError
-// !focus(1:5)
+// !focus(1:7)
 const result = await Effect.runPromise(
   program.pipe(
     Effect.catchTag('TimeoutError', (e) =>
@@ -617,7 +617,7 @@ const result = await Effect.runPromise(
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:6)
+// !focus(1:7)
 async function fetchWithTimeout(
   id: string
 ): Promise<TimeoutError | NetworkError | User> {
@@ -747,7 +747,7 @@ Guaranteeing resource cleanup even when an operation is cancelled or interrupted
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:9)
+// !focus(1:11)
 const withConnection = Effect.acquireRelease(
   Effect.sync(() => {
     const conn = createConnection()
@@ -760,7 +760,7 @@ const withConnection = Effect.acquireRelease(
   })
 )
 
-// !focus(1:6)
+// !focus(1:7)
 const program = Effect.scoped(
   Effect.gen(function* () {
     const conn = yield* withConnection
@@ -783,7 +783,7 @@ async function withConnection<T>(
   const conn = createConnection()
   console.log('opened')
 
-  // !focus(1:5)
+  // !focus(1:6)
   try {
     return await fn(conn)
   } finally {
@@ -821,7 +821,7 @@ const program = Effect.gen(function* () {
   return enriched
 })
 
-// !focus(1:6)
+// !focus(1:10)
 const result = await Effect.runPromise(
   program.pipe(
     Effect.catchTag('NotFoundError', () =>
@@ -874,7 +874,7 @@ const program = Effect.gen(function* () {
 })
 
 // Must provide the service before running
-// !focus(1:8)
+// !focus(1:9)
 const DatabaseLive = Layer.succeed(
   Database,
   {
@@ -942,7 +942,7 @@ const program = Effect.gen(function* () {
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:6)
+// !focus(1:10)
 function parseConfig(
   input: string
 ): ParseError | Config {
@@ -969,7 +969,7 @@ Which approach is better for public APIs? Effect requires callers to install and
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:4)
+// !focus(1:5)
 export function parse(
   input: string
 ): Effect.Effect<AST, ParseError> {
@@ -984,7 +984,7 @@ export function parse(
 ```
 
 ```typescript
-// !focus(1:4)
+// !focus(1:5)
 export function parse(
   input: string
 ): AST | ParseError {
