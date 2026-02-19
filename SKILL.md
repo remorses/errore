@@ -36,6 +36,9 @@ console.log(user.name)                  // TypeScript knows: User
 9. Use `const` + expressions, never `let` + try-catch — ternaries, IIFEs, `instanceof Error`
 10. Use early returns, never nested if-else — check error, return, continue flat
 11. Always include `Error` handler in `matchError` — required fallback for plain Error instances
+12. Use `errore.try` / `errore.tryAsync` as low as possible in the call stack — only at boundaries with uncontrolled dependencies (third-party libs, `JSON.parse`, `fetch`, file I/O). Your own code should return errors as values, not throw.
+13. Keep the code inside `errore.try` / `errore.tryAsync` minimal — wrap only the single throwing call, not your business logic. The `try` callback should be a one-liner calling the external dependency.
+14. Always prefer `errore.try` over `errore.tryFn` — they are the same function, but `errore.try` is the canonical name
 
 ## TypeScript Rules
 
@@ -244,6 +247,75 @@ async function fetchJson<T>(url: string): Promise<NetworkError | T> {
 ```
 
 > `errore.tryAsync` catches exceptions and maps them to typed errors. Use `errore.try` for sync code. The `cause` preserves the original exception.
+
+### try/tryAsync Placement (Boundary Rule)
+
+`errore.try` and `errore.tryAsync` should only appear at the **lowest level** of your call stack — right at the boundary with code you don't control (third-party libraries, `JSON.parse`, `fetch`, file I/O, etc.). Your own functions should never throw, so they never need to be wrapped in `try`.
+
+Keep the code inside the `try` callback **as small as possible** — ideally a single call to the external dependency. Don't put business logic inside `try`.
+
+Always use `errore.try`, never `errore.tryFn` — they are the same function but `errore.try` is the canonical name.
+
+<!-- bad -->
+```ts
+// wrapping too much code inside try — business logic should not be here
+async function getUser(id: string): Promise<AppError | User> {
+  return errore.tryAsync({
+    try: async () => {
+      const res = await fetch(`/users/${id}`)
+      const data = await res.json()
+      if (!data.active) throw new Error('inactive')
+      return { ...data, displayName: `${data.first} ${data.last}` }
+    },
+    catch: (e) => new AppError({ id, cause: e }),
+  })
+}
+```
+
+<!-- bad -->
+```ts
+// wrapping your own code that already returns errors as values
+async function processOrder(id: string): Promise<OrderError | Order> {
+  return errore.tryAsync({
+    try: () => createOrder(id),  // createOrder already returns errors!
+    catch: (e) => new OrderError({ id, cause: e }),
+  })
+}
+```
+
+<!-- good -->
+```ts
+// try only wraps the external dependency (fetch), nothing else
+async function getUser(id: string): Promise<NetworkError | User> {
+  const res = await errore.tryAsync({
+    try: () => fetch(`/users/${id}`),
+    catch: (e) => new NetworkError({ url: `/users/${id}`, cause: e }),
+  })
+  if (res instanceof Error) return res
+
+  const data = await errore.tryAsync({
+    try: () => res.json() as Promise<UserPayload>,
+    catch: (e) => new NetworkError({ url: `/users/${id}`, cause: e }),
+  })
+  if (data instanceof Error) return data
+
+  // business logic is outside try — plain code, not wrapped
+  if (!data.active) return new InactiveUserError({ id })
+  return { ...data, displayName: `${data.first} ${data.last}` }
+}
+```
+
+<!-- good -->
+```ts
+// your own functions return errors as values — no try needed
+async function processOrder(id: string): Promise<OrderError | Order> {
+  const order = await createOrder(id)
+  if (order instanceof Error) return order
+  return order
+}
+```
+
+> Think of `errore.try` / `errore.tryAsync` as the **adapter** between the throwing world (external code) and the errore world (errors as values). Once you've converted exceptions to values at the boundary, everything above is plain `instanceof` checks.
 
 ### Optional Values (| null)
 

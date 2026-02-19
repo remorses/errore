@@ -365,6 +365,11 @@ const response = await errore.tryAsync({
 })
 ```
 
+> **Best practices for `try` / `tryAsync`:**
+> - **Use as low as possible in the call stack** — only at boundaries with uncontrolled dependencies (third-party libs, `JSON.parse`, `fetch`, file I/O). Your own functions should return errors as values, never throw.
+> - **Keep the callback minimal** — wrap only the single throwing call, not your business logic. The `try` callback should be a one-liner.
+> - **Always prefer `errore.try` over `errore.tryFn`** — they are the same function, but `try` is the canonical name.
+
 ### Transformations
 
 **Transform and chain** operations:
