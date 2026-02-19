@@ -28,9 +28,9 @@ console.log(user.name)                  // TypeScript knows: User
 1. Always `import * as errore from 'errore'` — namespace import, never destructure
 2. Never throw for expected failures — return errors as values
 3. Never return `unknown | Error` — the union collapses to `unknown`, breaks narrowing
-4. Never use `try-catch` for control flow — use `errore.tryAsync` / `errore.try` to convert exceptions to values
+4. Avoid `try-catch` for control flow — use `errore.tryAsync` / `errore.try` to convert exceptions to values
 5. Use `createTaggedError` for domain errors — gives you `_tag`, typed properties, `$variable` interpolation, `cause`, `findCause`, `toJSON`, and fingerprinting
-6. Always annotate return types with the error union — `Promise<MyError | OtherError | Value>`
+6. Let TypeScript infer return types — only add explicit annotations when they improve readability (complex unions, public APIs) or when inference produces a wider type than intended
 7. Use `cause` to wrap errors — `new MyError({ ..., cause: originalError })`
 8. Use `| null` for optional values, not `| undefined` — three-way narrowing: `instanceof Error`, `=== null`, then value
 9. Use `const` + expressions, never `let` + try-catch — ternaries, IIFEs, `instanceof Error`
@@ -52,6 +52,34 @@ These TypeScript practices complement errore's philosophy:
 - **No uninitialized `let`** — use IIFE with returns instead of `let x; if (...) { x = ... }`
 - **Type empty arrays** — `const items: string[] = []` not `const items = []`
 - **Module imports for node builtins** — `import fs from 'node:fs'` then `fs.readFileSync(...)`, not named imports
+
+- **Let TypeScript infer return types** — don't annotate return types by default. TypeScript infers them from the code and the inferred type is always correct. Only add an explicit return type when it genuinely improves readability (complex unions, public API boundaries) or when inference produces a wider type than intended:
+  ```ts
+  // BAD: redundant annotation — TypeScript already infers this exact type
+  function getUser(id: string): Promise<NotFoundError | User> {
+    const user = await db.find(id)
+    if (!user) return new NotFoundError({ id })
+    return user
+  }
+
+  // GOOD: let inference do its job
+  function getUser(id: string) {
+    const user = await db.find(id)
+    if (!user) return new NotFoundError({ id })
+    return user
+  }
+
+  // GOOD: explicit annotation when it adds clarity on a complex public API
+  function processRequest(req: Request): Promise<
+    | ValidationError
+    | AuthError
+    | DbError
+    | null
+    | Response
+  > {
+    // ...
+  }
+  ```
 
 - **`.filter(isTruthy)` not `.filter(Boolean)`** — `Boolean` doesn't narrow types, so `(T | null)[]` stays `(T | null)[]` after filtering. Use a type guard instead:
   ```ts
@@ -91,9 +119,9 @@ These TypeScript practices complement errore's philosophy:
 
 Keep block nesting as low as possible. Every level of indentation is cognitive load. The ideal function reads top to bottom at root nesting level — a sequence of checks and early returns, no `else`, no nested `if`, no `try-catch`.
 
-### Never use `else`
+### Avoid `else`
 
-`else` is never necessary. Every `if-else` can be rewritten as an `if` with an early return followed by the rest of the code at root level:
+`else` is almost never necessary. Most `if-else` blocks can be rewritten as an `if` with an early return followed by the rest of the code at root level:
 
 ```ts
 // BAD: else creates unnecessary nesting
@@ -176,7 +204,7 @@ function processOrder(order: Order): ProcessError | Receipt {
 
 The transformation rule: take the outermost `if` condition, negate it, return the failure case, then continue at root level. Repeat for each nested `if`. The happy path falls through to the end.
 
-### Never use `try-catch` for control flow
+### Avoid `try-catch` for control flow
 
 `try-catch` is the worst offender for nesting. It forces a two-branch structure (`try` + `catch`) and hides which line threw. With errore, convert exceptions to values at boundaries and use `instanceof` checks:
 
