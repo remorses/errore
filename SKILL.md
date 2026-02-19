@@ -87,6 +87,162 @@ These TypeScript practices complement errore's philosophy:
   }
   ```
 
+## Flat Control Flow
+
+Keep block nesting as low as possible. Every level of indentation is cognitive load. The ideal function reads top to bottom at root nesting level — a sequence of checks and early returns, no `else`, no nested `if`, no `try-catch`.
+
+### Never use `else`
+
+`else` is never necessary. Every `if-else` can be rewritten as an `if` with an early return followed by the rest of the code at root level:
+
+```ts
+// BAD: else creates unnecessary nesting
+function getLabel(user: User): string {
+  if (user.isAdmin) {
+    return 'Admin'
+  } else {
+    return 'Member'
+  }
+}
+
+// GOOD: early return, no else
+function getLabel(user: User): string {
+  if (user.isAdmin) return 'Admin'
+  return 'Member'
+}
+```
+
+This applies to `else if` chains too — replace them with a sequence of early-return `if` blocks:
+
+```ts
+// BAD: else-if chain
+function getStatus(code: number): string {
+  if (code === 200) {
+    return 'ok'
+  } else if (code === 404) {
+    return 'not found'
+  } else if (code >= 500) {
+    return 'server error'
+  } else {
+    return 'unknown'
+  }
+}
+
+// GOOD: flat sequence of ifs
+function getStatus(code: number): string {
+  if (code === 200) return 'ok'
+  if (code === 404) return 'not found'
+  if (code >= 500) return 'server error'
+  return 'unknown'
+}
+```
+
+### Flatten nested `if` into root-level checks
+
+Any nested `if` can be converted to a series of root-level `if` statements by inverting conditions and returning early. This follows directly from boolean logic — `if (A) { if (B) { ... } }` is equivalent to `if (!A) return; if (!B) return; ...`:
+
+```ts
+// BAD: nested ifs — 3 levels deep
+function processOrder(order: Order): ProcessError | Receipt {
+  if (order.items.length > 0) {
+    if (order.payment) {
+      if (order.payment.verified) {
+        return createReceipt(order)
+      } else {
+        return new ProcessError({ reason: 'Payment not verified' })
+      }
+    } else {
+      return new ProcessError({ reason: 'No payment method' })
+    }
+  } else {
+    return new ProcessError({ reason: 'Empty cart' })
+  }
+}
+
+// GOOD: flat — every check at root level
+function processOrder(order: Order): ProcessError | Receipt {
+  if (order.items.length === 0) {
+    return new ProcessError({ reason: 'Empty cart' })
+  }
+  if (!order.payment) {
+    return new ProcessError({ reason: 'No payment method' })
+  }
+  if (!order.payment.verified) {
+    return new ProcessError({ reason: 'Payment not verified' })
+  }
+  return createReceipt(order)
+}
+```
+
+The transformation rule: take the outermost `if` condition, negate it, return the failure case, then continue at root level. Repeat for each nested `if`. The happy path falls through to the end.
+
+### Never use `try-catch` for control flow
+
+`try-catch` is the worst offender for nesting. It forces a two-branch structure (`try` + `catch`) and hides which line threw. With errore, convert exceptions to values at boundaries and use `instanceof` checks:
+
+```ts
+// BAD: try-catch nesting
+async function loadConfig(): Promise<Config> {
+  try {
+    const raw = await fs.readFile('config.json', 'utf-8')
+    try {
+      const parsed = JSON.parse(raw)
+      if (!parsed.port) {
+        throw new Error('Missing port')
+      }
+      return parsed
+    } catch (e) {
+      throw new Error(`Invalid JSON: ${e}`)
+    }
+  } catch (e) {
+    return { port: 3000 }
+  }
+}
+
+// GOOD: flat with errore
+async function loadConfig(): Promise<Config> {
+  const raw = await errore.tryAsync({
+    try: () => fs.readFile('config.json', 'utf-8'),
+    catch: (e) => new ConfigError({ reason: 'Read failed', cause: e }),
+  })
+  if (raw instanceof Error) return { port: 3000 }
+
+  const parsed = errore.try({
+    try: () => JSON.parse(raw) as Config,
+    catch: (e) => new ConfigError({ reason: 'Invalid JSON', cause: e }),
+  })
+  if (parsed instanceof Error) return { port: 3000 }
+
+  if (!parsed.port) return { port: 3000 }
+
+  return parsed
+}
+```
+
+### Keep the happy path at minimum indentation
+
+Structure functions so the success path runs at the root nesting level (zero indentation inside the function body). Error cases are handled at the top of each step and exit early. The reader scans down the left edge to follow the main logic:
+
+```ts
+async function handleRequest(req: Request): Promise<AppError | Response> {
+  const body = await parseBody(req)
+  if (body instanceof Error) return body
+
+  const user = await authenticate(req.headers)
+  if (user instanceof Error) return user
+
+  const permission = checkPermission(user, body.resource)
+  if (permission instanceof Error) return permission
+
+  const result = await execute(body.action, body.resource)
+  if (result instanceof Error) return result
+
+  return new Response(JSON.stringify(result), { status: 200 })
+}
+```
+
+> Every line of actual logic is at nesting level 1 (the function body). Error checks are short, self-contained, and exit immediately. No `else`, no `try-catch`, no nesting.
+
 ## Patterns
 
 ### Expressions over Statements
