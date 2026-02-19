@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
+import { renderComparisonPage } from './comparison-page'
+import comparisonMd from './errore-vs-effect.md'
 
 const app = new Hono()
 
@@ -735,6 +737,11 @@ function Page() {
     </html>
   `
 }
+
+app.get('/errore-vs-effect', async (c) => {
+  const pageHtml = await renderComparisonPage(comparisonMd)
+  return c.html(pageHtml)
+})
 
 app.get('*', (c) => {
   const url = new URL(c.req.url)

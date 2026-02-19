@@ -2,6 +2,13 @@
   "name": "errore-manifesto",
   "main": "worker/worker.tsx",
   "compatibility_date": "2024-01-01",
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.md"],
+      "fallthrough": false
+    }
+  ],
   "assets": {
     "directory": "public",
     "binding": "ASSETS"

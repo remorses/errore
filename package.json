@@ -51,5 +51,9 @@
     "mitata": "^1.0.34",
     "typescript": "^5.0.0",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@code-hike/lighter": "^1.0.3",
+    "marked": "^17.0.3"
   }
 }
