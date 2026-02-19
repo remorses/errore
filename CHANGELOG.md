@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.12.0
+
+- Add `DisposableStack` and `AsyncDisposableStack` polyfills for Go-like defer cleanup semantics using TC39 Explicit Resource Management (`using` / `await using`)
+  - Works in every runtime — no native DisposableStack support required
+  - Provides `defer()`, `use()`, `adopt()`, `move()` methods with LIFO cleanup ordering
+  - Includes SuppressedError fallback for error chaining
+  - 32 tests covering LIFO ordering, double-dispose safety, error chaining, and errore integration patterns
+- Add `/errore-vs-effect` comparison page showing side-by-side code examples of errore vs Effect.ts patterns
+  - Server-side syntax highlighting with @code-hike/lighter
+  - 25+ sections covering error handling, async, retries, timeouts, cleanup, and architecture patterns
+  - Light/dark theme toggle via CSS prefers-color-scheme
+- Add benchmarks comparing Effect.gen vs errore performance
+  - errore is 3-8x faster in sync loops, 4-7x faster in async
+  - Near-zero heap allocations vs Effect's kb-range
+- Expand SKILL.md with comprehensive agent-oriented reference
+  - 16 self-contained before/after recipe patterns
+  - Rules for try/tryAsync boundary placement (use at lowest call stack level only)
+  - Flat control flow patterns (avoid nesting, prefer early returns)
+  - TypeScript rules for isTruthy filters, AbortController with Error instances, no silent catch blocks
+- Add return type inference guidance to SKILL.md
+- Add Effect.ts before/after comparison examples to documentation
+- Rename `bench/` to `benchmarks/`
+
 ## 0.11.0
 
 - Add `fingerprint` property to all tagged errors for stable Sentry/logging error grouping
