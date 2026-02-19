@@ -94,9 +94,18 @@ export async function renderComparisonPage(mdContent: string): Promise<string> {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>errore vs Effect — Side-by-Side Comparison</title>
   <meta name="description" content="Compare Effect.ts and errore side by side. See how typed error handling looks with each approach." />
+  <meta property="og:title" content="errore vs Effect — Side-by-Side Comparison" />
+  <meta property="og:description" content="Compare Effect.ts and errore side by side. See how typed error handling looks with each approach." />
+  <meta property="og:image" content="https://errore.org/og-errore-vs-effect.png" />
+  <meta property="og:url" content="https://errore.org/errore-vs-effect" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="errore vs Effect — Side-by-Side Comparison" />
+  <meta name="twitter:description" content="Compare Effect.ts and errore side by side. See how typed error handling looks with each approach." />
+  <meta name="twitter:image" content="https://errore.org/og-errore-vs-effect.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet" />
   <style>${getStyles()}</style>
 </head>
 <body>
@@ -166,7 +175,7 @@ function getStyles(): string {
       max-width: 1000px;
       margin: 0 auto;
       padding: 3rem 2rem 2rem;
-      text-align: center;
+      text-align: left;
     }
     .back-link {
       display: inline-block;
@@ -177,6 +186,7 @@ function getStyles(): string {
     }
     .back-link:hover { color: var(--fg); }
     .page-header h1 {
+      font-family: 'Source Serif 4', Georgia, serif;
       font-size: 2.5rem;
       font-weight: 700;
       letter-spacing: -0.02em;
@@ -202,6 +212,7 @@ function getStyles(): string {
     /* Section */
     .comparison-section {
       margin-bottom: 4rem;
+      text-align: left;
     }
 
     /* Group headings (h1 sections with no code blocks) */
@@ -227,8 +238,9 @@ function getStyles(): string {
       margin: 0 0 1.5rem;
     }
     .comparison-prose h2 {
+      font-family: 'Source Serif 4', Georgia, serif;
       font-size: 1.5rem;
-      font-weight: 700;
+      font-weight: 600;
       margin-bottom: 0.5rem;
       letter-spacing: -0.01em;
     }

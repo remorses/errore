@@ -706,6 +706,8 @@ function Page() {
 
           <p><strong>Use Effect</strong> when you want DI, structured concurrency, and the full FP experience. <strong>Use errore</strong> when you just want type-safe errors without rewriting your codebase.</p>
 
+          <p><a href="/errore-vs-effect">See the full side-by-side comparison →</a></p>
+
           <h2>Zero-Dependency Philosophy</h2>
 
           <p>errore is more a <strong>way of writing code</strong> than a library. The core pattern requires nothing:</p>
@@ -727,7 +729,7 @@ function Page() {
 
         <footer>
           <pre class="language-bash"><code class="language-bash">npm install errore</code></pre>
-          <p><a href="https://github.com/remorses/errore">GitHub</a> · Made by <a href="https://github.com/remorses">remorses</a></p>
+          <p><a href="https://github.com/remorses/errore">GitHub</a> · <a href="/errore-vs-effect">errore vs Effect</a> · Made by <a href="https://github.com/remorses">remorses</a></p>
         </footer>
 
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
