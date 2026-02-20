@@ -5,6 +5,7 @@
 
 import { marked } from 'marked'
 import { highlightCode } from './highlight'
+import { darkModeColors } from './shared-styles'
 
 interface Section {
   prose: string
@@ -150,14 +151,14 @@ function getStyles(): string {
 
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #0d1117;
-        --fg: #e6edf3;
-        --fg-secondary: #b1bac4;
-        --fg-muted: #8b949e;
-        --fg-faint: #6e7681;
-        --fg-dim: #484f58;
-        --inline-code-bg: #21262d;
-        --border: #21262d;
+        --bg: ${darkModeColors.bg};
+        --fg: ${darkModeColors.fg};
+        --fg-secondary: ${darkModeColors.fgSecondary};
+        --fg-muted: ${darkModeColors.fgMuted};
+        --fg-faint: ${darkModeColors.fgFaint};
+        --fg-dim: ${darkModeColors.fgDim};
+        --inline-code-bg: ${darkModeColors.inlineCodeBg};
+        --border: ${darkModeColors.border};
         --code-border: rgba(255,255,255,0.08);
       }
     }

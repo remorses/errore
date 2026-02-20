@@ -2,23 +2,12 @@ import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { renderComparisonPage } from './comparison-page'
 import comparisonMd from './errore-vs-effect.md'
+import { css, baseReset } from './shared-styles'
 
 const app = new Hono()
 
-function css(strings: TemplateStringsArray, ...exprs: any[]): string {
-  let result = strings[0] ?? ''
-  for (let i = 0; i < exprs.length; i++) {
-    result += String(exprs[i]) + (strings[i + 1] ?? '')
-  }
-  return result
-}
-
 const styles = css`
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
+  ${baseReset}
 
   :root {
     --color-bg: #f6f5f1;
@@ -29,9 +18,24 @@ const styles = css`
     --color-link: #0d7d8c;
     --color-code-bg: #fdfcf9;
     --color-code-border: #e8e6e1;
+    --color-inline-code-bg: rgba(0, 0, 0, 0.04);
     --font-serif: 'Source Serif 4', Georgia, serif;
     --font-sans: 'Lato', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'IBM Plex Mono', 'SF Mono', Monaco, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-bg: #0d1117;
+      --color-text: #e6edf3;
+      --color-text-secondary: #b1bac4;
+      --color-text-muted: #8b949e;
+      --color-accent: #2dd4e4;
+      --color-link: #39d0df;
+      --color-code-bg: #161b22;
+      --color-code-border: #21262d;
+      --color-inline-code-bg: #21262d;
+    }
   }
 
   html {
@@ -157,7 +161,7 @@ const styles = css`
     font-family: var(--font-mono);
     font-size: 0.8em;
     font-weight: 500;
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--color-inline-code-bg);
     padding: 0.1em 0.35em;
     border-radius: 4px;
     color: var(--color-text);
@@ -217,6 +221,63 @@ const styles = css`
   .token.important,
   .token.variable {
     color: #e07c46;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .token.comment,
+    .token.prolog,
+    .token.doctype,
+    .token.cdata {
+      color: #8b949e;
+    }
+
+    .token.punctuation {
+      color: #8b949e;
+    }
+
+    .token.property,
+    .token.tag,
+    .token.boolean,
+    .token.number,
+    .token.constant,
+    .token.symbol,
+    .token.deleted {
+      color: #ff7b72;
+    }
+
+    .token.selector,
+    .token.attr-name,
+    .token.string,
+    .token.char,
+    .token.builtin,
+    .token.inserted {
+      color: #7ee787;
+    }
+
+    .token.operator,
+    .token.entity,
+    .token.url,
+    .language-css .token.string,
+    .style .token.string {
+      color: #ffa657;
+    }
+
+    .token.atrule,
+    .token.attr-value,
+    .token.keyword {
+      color: #d2a8ff;
+    }
+
+    .token.function,
+    .token.class-name {
+      color: #79c0ff;
+    }
+
+    .token.regex,
+    .token.important,
+    .token.variable {
+      color: #ffa657;
+    }
   }
 
   ul, ol {
