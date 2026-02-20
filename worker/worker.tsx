@@ -204,6 +204,7 @@ const styles = css`
   .language-css .token.string,
   .style .token.string {
     color: #a67f59;
+    background: none;
   }
 
   .token.atrule,
