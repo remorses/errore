@@ -1,12 +1,4 @@
-/**
- * Serialize cause for JSON output
- */
-const serializeCause = (cause: unknown): unknown => {
-  if (cause instanceof Error) {
-    return { name: cause.name, message: cause.message, stack: cause.stack }
-  }
-  return cause
-}
+import { serializeCause } from './serialize-cause.js'
 
 /**
  * Any class that extends Error (used by findCause)
@@ -130,7 +122,7 @@ export const TaggedError: {
       const ActualBase = (BaseClass ?? Error) as typeof Error
 
       // Keys that are managed internally and must not be overwritten by user props
-      const RESERVED_KEYS = new Set(['_tag', 'fingerprint', 'name', 'stack'])
+      const RESERVED_KEYS = new Set(['_tag', 'fingerprint', 'name', 'stack', 'message', 'cause'])
 
       class Tagged extends ActualBase {
         readonly _tag: Tag = tag

@@ -955,6 +955,13 @@ describe('unknown value type (lossy union)', () => {
 })
 
 describe('createTaggedError factory', () => {
+  test('forbids $message template variable', () => {
+    expect(() => createTaggedError({
+      name: 'BadTemplateError',
+      message: 'Bad: $message',
+    })).toThrow('$message is reserved')
+  })
+
   test('creates error with interpolated message', () => {
     const NotFoundError = createTaggedError({
       name: 'NotFoundError',

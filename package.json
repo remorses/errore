@@ -46,14 +46,12 @@
   "author": "remorses",
   "license": "MIT",
   "devDependencies": {
+    "@code-hike/lighter": "^1.0.3",
     "effect": "^3.19.18",
     "hono": "^4.11.5",
+    "marked": "^17.0.3",
     "mitata": "^1.0.34",
     "typescript": "^5.0.0",
     "vitest": "^3.2.4"
-  },
-  "dependencies": {
-    "@code-hike/lighter": "^1.0.3",
-    "marked": "^17.0.3"
   }
 }

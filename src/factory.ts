@@ -1,4 +1,5 @@
 import { findCause } from './error.js'
+import { serializeCause } from './serialize-cause.js'
 
 /**
  * Factory API for creating tagged errors with $variable interpolation in messages.
@@ -110,16 +111,6 @@ export type FactoryTaggedErrorClass<
 }
 
 /**
- * Serialize cause for JSON output
- */
-const serializeCause = (cause: unknown): unknown => {
-  if (cause instanceof Error) {
-    return { name: cause.name, message: cause.message, stack: cause.stack }
-  }
-  return cause
-}
-
-/**
  * Parse $variable placeholders from message template.
  * Returns array of variable names found.
  */
@@ -220,11 +211,18 @@ export function createTaggedError<
   const BaseError = opts.extends ?? Error
   const varNames = parseVariables(messageTemplate)
 
+  if (varNames.includes('message')) {
+    throw new Error(
+      `createTaggedError(${tag}): template variable $message is reserved and not allowed. `
+        + `Use a different variable name like $reason or $detail.`,
+    )
+  }
+
   // Use a type assertion to help TypeScript understand the base class
   const TypedBase = BaseError as typeof Error
 
   // Keys that are managed internally and must not be overwritten by template variables
-  const RESERVED_KEYS = new Set(['_tag', 'messageTemplate', 'fingerprint', 'name', 'stack'])
+  const RESERVED_KEYS = new Set(['_tag', 'messageTemplate', 'fingerprint', 'name', 'stack', 'message', 'cause'])
 
   class Tagged extends TypedBase {
     readonly _tag: Name = tag
@@ -280,7 +278,7 @@ export function createTaggedError<
       }
       // Include variable properties
       for (const varName of varNames) {
-        if (varName in this) {
+        if (varName in this && !RESERVED_KEYS.has(varName)) {
           json[varName] = (this as Record<string, unknown>)[varName]
         }
       }
