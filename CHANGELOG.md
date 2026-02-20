@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.13.0
+
+- Add `AbortError` base class and `isAbortError` utility for typed abort/cancellation handling
+  - `AbortError` extends `Error` with `name = 'AbortError'` — use as the `extends` base for custom abort errors so `isAbortError` can detect them even when wrapped in a cause chain
+  - `isAbortError(error)` walks the full `.cause` chain, detecting: native `DOMException` from bare `controller.abort()`, direct `errore.AbortError` instances, and tagged errors that extend `errore.AbortError` (where `.name` is overridden to the tag)
+  - Handles circular `.cause` references safely with a `Set`
+  - 11 new tests covering all detection paths, edge cases, and circular cause protection
+- Document idiomatic `.catch()` pattern for async boundaries (replaces `tryAsync` in all examples)
+  - `promise.catch((e) => new MyError({ cause: e }))` is now the canonical form — simpler, no wrapper object, TypeScript infers the union automatically
+  - `errore.tryAsync` still exists but `.catch()` is the preferred style
+  - `errore.try` remains the right tool for sync throwing code (`JSON.parse`, etc.)
+  - Updated SKILL.md rules 12–17, all before/after examples, README, MIGRATION.md, and comparison page
+- Add `controller.abort()` typed reason convention to SKILL.md
+  - `abort(reason)` throws `reason` as-is — MUST pass a tagged error extending `errore.AbortError`, never plain `Error` or string
+  - New "Abort & Cancellation" recipe section with full before/after example
+- Export `AbortError` and `isAbortError` from the package root
+
 ## 0.12.0
 
 - Add `DisposableStack` and `AsyncDisposableStack` polyfills for Go-like defer cleanup semantics using TC39 Explicit Resource Management (`using` / `await using`)
