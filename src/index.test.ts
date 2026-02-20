@@ -17,6 +17,8 @@ import {
   UnhandledError,
   createTaggedError,
   findCause,
+  AbortError,
+  isAbortError,
 } from './index.js'
 
 // ============================================================================
@@ -608,6 +610,7 @@ describe('real-world: fetch user flow', () => {
       err: (e) => `Failed: ${e.message}`,
     })
 
+
     expect(message).toBe('Failed: Connection failed')
   })
 })
@@ -1020,6 +1023,7 @@ describe('createTaggedError factory', () => {
 
     const originalError = new Error('original')
     const err = new WrapperError({ item: 'data', cause: originalError })
+
 
     expect(err.cause).toBe(originalError)
     expect(err.message).toBe('Failed to process data')
@@ -1469,5 +1473,125 @@ describe('findCause', () => {
     ;(a as any).cause = b
     // Should not infinite loop, should return undefined for unrelated class
     expect(findCause(b, UnrelatedError)).toBeUndefined()
+  })
+})
+
+// ============================================================================
+// AbortError & isAbortError
+// ============================================================================
+
+describe('AbortError', () => {
+  test('has name AbortError', () => {
+    const err = new AbortError()
+    expect(err.name).toBe('AbortError')
+    expect(err.message).toBe('The operation was aborted')
+  })
+
+  test('accepts custom message', () => {
+    const err = new AbortError('Request cancelled')
+    expect(err.message).toBe('Request cancelled')
+    expect(err.name).toBe('AbortError')
+  })
+
+  test('accepts cause via options', () => {
+    const cause = new Error('underlying')
+    const err = new AbortError('aborted', { cause })
+    expect(err.cause).toBe(cause)
+  })
+
+  test('is instanceof Error', () => {
+    expect(new AbortError()).toBeInstanceOf(Error)
+  })
+})
+
+describe('isAbortError', () => {
+  test('detects direct AbortError', () => {
+    expect(isAbortError(new AbortError())).toBe(true)
+  })
+
+  test('detects native DOMException AbortError', () => {
+    const err = new DOMException('aborted', 'AbortError')
+    expect(isAbortError(err)).toBe(true)
+  })
+
+  test('detects AbortError in cause chain', () => {
+    const abort = new AbortError()
+    const wrapped = new Error('network failed', { cause: abort })
+    expect(isAbortError(wrapped)).toBe(true)
+  })
+
+  test('detects AbortError deep in cause chain', () => {
+    const abort = new AbortError()
+    const mid = new Error('mid', { cause: abort })
+    const outer = new Error('outer', { cause: mid })
+    expect(isAbortError(outer)).toBe(true)
+  })
+
+  test('detects tagged error extending AbortError', () => {
+    class TimeoutError extends createTaggedError({
+      name: 'TimeoutError',
+      message: 'Timed out after $duration',
+      extends: AbortError,
+    }) {}
+
+    const err = new TimeoutError({ duration: '5s' })
+    // createTaggedError overrides name to 'TimeoutError', but instanceof still works
+    expect(err.name).toBe('TimeoutError')
+    expect(err).toBeInstanceOf(AbortError)
+    expect(isAbortError(err)).toBe(true)
+  })
+
+  test('detects tagged abort error in cause chain (wrapped by .catch)', () => {
+    class TimeoutError extends createTaggedError({
+      name: 'TimeoutError',
+      message: 'Timed out after $duration',
+      extends: AbortError,
+    }) {}
+
+    class NetworkError extends createTaggedError({
+      name: 'NetworkError',
+      message: 'Request to $url failed',
+    }) {}
+
+    // Simulates: fetch(url, { signal }).catch((e) => new NetworkError({ url, cause: e }))
+    const timeout = new TimeoutError({ duration: '5s' })
+    const network = new NetworkError({ url: '/api', cause: timeout })
+
+    expect(isAbortError(network)).toBe(true)
+    // Can also extract the specific error via findCause
+    expect(findCause(network, TimeoutError)).toBe(timeout)
+  })
+
+  test('returns false for non-abort errors', () => {
+    expect(isAbortError(new Error('oops'))).toBe(false)
+    expect(isAbortError(new TypeError('bad type'))).toBe(false)
+  })
+
+  test('returns false for non-errors', () => {
+    expect(isAbortError('string')).toBe(false)
+    expect(isAbortError(null)).toBe(false)
+    expect(isAbortError(undefined)).toBe(false)
+    expect(isAbortError(42)).toBe(false)
+  })
+
+  test('returns false for plain Error passed to abort (not extending AbortError)', () => {
+    // This is why the rule says: MUST use extends: errore.AbortError
+    const err = new Error('timeout')
+    const wrapped = new Error('network failed', { cause: err })
+    expect(isAbortError(wrapped)).toBe(false)
+  })
+
+  test('detects native DOMException AbortError in cause chain', () => {
+    const abort = new DOMException('aborted', 'AbortError')
+    const wrapped = new Error('fetch failed', { cause: abort })
+    expect(isAbortError(wrapped)).toBe(true)
+  })
+
+  test('handles circular cause gracefully', () => {
+    const a = new Error('a')
+    const b = new Error('b', { cause: a })
+    ;(a as any).cause = b
+    // Should not infinite loop
+    expect(isAbortError(b)).toBe(false)
   })
 })

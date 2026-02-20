@@ -257,6 +257,54 @@ export function matchErrorPartial<E extends Error, R>(
 }
 
 /**
+ * Base class for abort-related errors.
+ * Extend this in custom abort errors so `isAbortError` detects them
+ * even when wrapped in a cause chain.
+ *
+ * @example
+ * class TimeoutError extends errore.createTaggedError({
+ *   name: 'TimeoutError',
+ *   message: 'Request timed out for $operation',
+ *   extends: errore.AbortError,
+ * }) {}
+ *
+ * controller.abort(new TimeoutError({ operation: 'fetch' }))
+ */
+export class AbortError extends Error {
+  constructor(message = 'The operation was aborted', options?: ErrorOptions) {
+    super(message, options)
+    this.name = 'AbortError'
+  }
+}
+
+/**
+ * Check if an error (or any error in its `.cause` chain) is an abort error.
+ * Detects native AbortError (DOMException), errore.AbortError, and any
+ * tagged error that extends errore.AbortError.
+ *
+ * @example
+ * const res = await fetch(url, { signal })
+ *   .catch((e) => new NetworkError({ url, cause: e }))
+ * if (errore.isAbortError(res)) {
+ *   // request was aborted — timeout, user cancel, etc.
+ * }
+ */
+export function isAbortError(error: unknown): boolean {
+  const seen = new Set<Error>()
+  let current: unknown = error
+  while (current instanceof Error) {
+    if (seen.has(current)) break
+    seen.add(current)
+    // Native DOMException AbortError or direct AbortError (name = 'AbortError')
+    if (current.name === 'AbortError') return true
+    // Tagged errors extending AbortError (createTaggedError overrides name to _tag)
+    if (current instanceof AbortError) return true
+    current = current.cause
+  }
+  return false
+}
+
+/**
  * Default error type when catching unknown exceptions.
  */
 export class UnhandledError extends TaggedError('UnhandledError')<{
