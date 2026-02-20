@@ -450,16 +450,23 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-// !focus(1:12)
+import * as errore from 'errore'
+
+// !focus(1:14)
 async function getUser(
   id: string
 ): Promise<NetworkError | User> {
   const res = await fetch(`/api/users/${id}`)
-    .catch(() => null)
-  if (!res) return new NetworkError({
-    url: `/api/users/${id}`
-  })
-  return res.json()
+    .catch((e) => new NetworkError({
+      url: `/api/users/${id}`, cause: e
+    }))
+  if (res instanceof Error) return res
+
+  const data = await (res.json() as Promise<User>)
+    .catch((e) => new NetworkError({
+      url: `/api/users/${id}`, cause: e
+    }))
+  return data
 }
 
 const user = await getUser('123')
@@ -599,27 +606,24 @@ const result = await Effect.runPromise(
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:21)
+// !focus(1:17)
 async function fetchWithTimeout(
   id: string
-): Promise<TimeoutError | NetworkError | User> {
+): Promise<NetworkError | User> {
   const controller = new AbortController()
   const timer = setTimeout(
     () => controller.abort(), 5000
   )
 
-  const user = await errore.tryAsync({
-    try: () => fetchUser(id, {
-      signal: controller.signal
-    }),
-    catch: (e) => e.name === 'AbortError'
-      ? new TimeoutError({ operation: 'fetchUser' })
-      : new NetworkError({ url: `/users/${id}` })
-  })
+  const user = await fetchUser(id, {
+    signal: controller.signal
+  }).catch((e) => new NetworkError({
+    url: `/users/${id}`, cause: e
+  }))
   clearTimeout(timer)
 
   if (user instanceof Error) return user
-  console.log(user.name)
+  return user
 }
 ```
 
@@ -764,10 +768,8 @@ async function queryDb(
   })
 
   // If anything fails, connection is still closed
-  return errore.tryAsync({
-    try: () => query(conn, sql),
-    catch: (e) => new DbError({ cause: e }),
-  })
+  return query(conn, sql)
+    .catch((e) => new DbError({ cause: e }))
 }
 
 // !focus(1:2)
@@ -812,7 +814,7 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:16)
+// !focus(1:15)
 // await using = cleanup runs on every exit path
 async function getData(): Promise<FetchError | Data> {
   await using cleanup =
@@ -822,10 +824,8 @@ async function getData(): Promise<FetchError | Data> {
     console.log('Cleanup completed')
   )
 
-  const data = await errore.tryAsync({
-    try: () => fetchData(),
-    catch: (e) => new FetchError({ cause: e }),
-  })
+  const data = await fetchData()
+    .catch((e) => new FetchError({ cause: e }))
   return data
   // cleanup runs automatically
 }
@@ -861,7 +861,7 @@ await Effect.runPromise(runnable)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:15)
+// !focus(1:14)
 async function getData(): Promise<FetchError | Data> {
   await using cleanup =
     new errore.AsyncDisposableStack()
@@ -870,10 +870,8 @@ async function getData(): Promise<FetchError | Data> {
     console.log('Finalizer: done')
   )
 
-  const data = await errore.tryAsync({
-    try: () => fetchData(),
-    catch: (e) => new FetchError({ cause: e }),
-  })
+  const data = await fetchData()
+    .catch((e) => new FetchError({ cause: e }))
   return data
   // "Finalizer: done" runs on every exit path
 }
@@ -919,32 +917,26 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:31)
+// !focus(1:25)
 async function processOrder(
   orderId: string
 ): Promise<DbError | CacheError | Order> {
   await using cleanup =
     new errore.AsyncDisposableStack()
 
-  const db = await errore.tryAsync({
-    try: () => connectDb(),
-    catch: (e) => new DbError({ orderId, cause: e }),
-  })
+  const db = await connectDb()
+    .catch((e) => new DbError({ orderId, cause: e }))
   if (db instanceof Error) return db
   cleanup.defer(() => db.close())
 
-  const cache = await errore.tryAsync({
-    try: () => openCache(),
-    catch: (e) =>
-      new CacheError({ orderId, cause: e }),
-  })
+  const cache = await openCache()
+    .catch((e) =>
+      new CacheError({ orderId, cause: e }))
   if (cache instanceof Error) return cache
   cleanup.defer(() => cache.flush())
 
-  const order = await errore.tryAsync({
-    try: () => db.query(orderId),
-    catch: (e) => new DbError({ orderId, cause: e }),
-  })
+  const order = await db.query(orderId)
+    .catch((e) => new DbError({ orderId, cause: e }))
   if (order instanceof Error) return order
 
   await cache.set(orderId, order)
@@ -988,10 +980,10 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:29)
+// !focus(1:23)
 async function queryWithTimeout(
   sql: string
-): Promise<TimeoutError | DbError | Row[]> {
+): Promise<DbError | Row[]> {
   await using cleanup =
     new errore.AsyncDisposableStack()
 
@@ -1002,21 +994,15 @@ async function queryWithTimeout(
   )
   cleanup.defer(() => clearTimeout(timer))
 
-  const conn = await errore.tryAsync({
-    try: () => connect({ signal: controller.signal }),
-    catch: (e) => e.name === 'AbortError'
-      ? new TimeoutError({ operation: 'connect' })
-      : new DbError({ cause: e }),
-  })
+  const conn = await connect({
+    signal: controller.signal
+  }).catch((e) => new DbError({ cause: e }))
   if (conn instanceof Error) return conn
   cleanup.defer(() => conn.close())
 
-  return errore.tryAsync({
-    try: () => conn.query(sql),
-    catch: (e) => e.name === 'AbortError'
-      ? new TimeoutError({ operation: 'query' })
-      : new DbError({ cause: e }),
-  })
+  return conn.query(sql)
+    .catch((e) => new DbError({ cause: e }))
+  // caller uses errore.isAbortError() to detect timeout
   // cleanup: conn.close() → clearTimeout()
 }
 ```
@@ -1112,15 +1098,13 @@ await Effect.runPromise(runnable)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:10)
+// !focus(1:8)
 // Just pass the dependency as a parameter
 async function getUsers(
   db: { query: (sql: string) => Promise<Row[]> }
 ): Promise<DbError | Row[]> {
-  return errore.tryAsync({
-    try: () => db.query('SELECT * FROM users'),
-    catch: (e) => new DbError({ cause: e }),
-  })
+  return db.query('SELECT * FROM users')
+    .catch((e) => new DbError({ cause: e }))
 }
 
 // !focus(1:4)
@@ -1162,7 +1146,7 @@ function parseConfig(
   input: string
 ): ParseError | Config {
   return errore.try({
-    try: () => JSON.parse(input),
+    try: () => JSON.parse(input) as Config,
     catch: (e) => new ParseError({
       reason: e.message
     })

@@ -54,20 +54,16 @@ class RequestFailedError extends errore.createTaggedError({
 async function getTodo(
   id: number
 ): Promise<InvalidJsonError | RequestFailedError | { todo: any }> {
-  const response = await errore.tryAsync({
-    try: () => fetch(`/todos/${id}`),
-    catch: (e) => new RequestFailedError({ id: String(id), cause: e }),
-  })
+  const response = await fetch(`/todos/${id}`)
+    .catch((e) => new RequestFailedError({ id: String(id), cause: e }))
   if (response instanceof Error) return response
 
   if (!response.ok) {
     return new RequestFailedError({ id: String(id) })
   }
 
-  const body = await errore.tryAsync({
-    try: () => response.json(),
-    catch: (e) => new InvalidJsonError({ id: String(id), cause: e }),
-  })
+  const body = await response.json()
+    .catch((e) => new InvalidJsonError({ id: String(id), cause: e }))
   if (body instanceof Error) return body
 
   return { todo: body }
@@ -75,7 +71,7 @@ async function getTodo(
 ```
 
 **What changed:**
-- No try/catch at all — `errore.tryAsync` converts exceptions to values
+- No try/catch at all — `.catch()` converts exceptions to values
 - Each error is a distinct class with typed properties and a `cause` chain
 - Flat control flow: check, return early, continue
 - Return type `InvalidJsonError | RequestFailedError | { todo: any }` is a real union — TypeScript enforces exhaustive handling at the call site
@@ -180,15 +176,14 @@ async function getTodo(
   }: { retries?: number; retryBaseDelay?: number }
 ): Promise<InvalidJsonError | RequestFailedError | { todo: any }> {
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const response = await errore.tryAsync({
-      try: () => fetch(`/todos/${id}`),
-      catch: (e) =>
+    const response = await fetch(`/todos/${id}`)
+      .catch((e) =>
         new RequestFailedError({
           id: String(id),
           attempts: String(attempt + 1),
           cause: e,
         }),
-    })
+      )
 
     if (response instanceof Error) {
       if (attempt < retries) {
@@ -209,11 +204,10 @@ async function getTodo(
       })
     }
 
-    const body = await errore.tryAsync({
-      try: () => response.json(),
-      catch: (e) =>
+    const body = await response.json()
+      .catch((e) =>
         new InvalidJsonError({ id: String(id), cause: e }),
-    })
+      )
 
     if (body instanceof Error) {
       if (attempt < retries) {
@@ -331,6 +325,7 @@ class RequestFailedError extends errore.createTaggedError({
 class TimeoutError extends errore.createTaggedError({
   name: "TimeoutError",
   message: "Request timed out for todo $id",
+  extends: errore.AbortError,
 }) {}
 
 async function getTodo(
@@ -345,34 +340,29 @@ async function getTodo(
     signal?: AbortSignal
   }
 ): Promise<
-  InvalidJsonError | RequestFailedError | TimeoutError | { todo: any }
+  InvalidJsonError | RequestFailedError | { todo: any }
 > {
   for (let attempt = 0; attempt <= retries; attempt++) {
     // Abort handling: combine caller signal with per-request timeout
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 1000)
+    const timeout = setTimeout(() => controller.abort(new TimeoutError({ id: String(id) })), 1000)
     const onAbort = () => controller.abort()
     signal?.addEventListener("abort", onAbort, { once: true })
 
-    const response = await errore.tryAsync({
-      try: () => fetch(`/todos/${id}`, { signal: controller.signal }),
-      catch: (e) => {
-        if (e.name === "AbortError") {
-          return new TimeoutError({ id: String(id), cause: e })
-        }
-        return new RequestFailedError({
+    const response = await fetch(`/todos/${id}`, { signal: controller.signal })
+      .catch((e) =>
+        new RequestFailedError({
           id: String(id),
           attempts: String(attempt + 1),
           cause: e,
-        })
-      },
-    })
+        }),
+      )
 
     clearTimeout(timeout)
     signal?.removeEventListener("abort", onAbort)
 
-    // Timeout is never retried
-    if (response instanceof TimeoutError) return response
+    // Abort errors (timeout) are never retried
+    if (errore.isAbortError(response)) return response
 
     if (response instanceof Error) {
       if (attempt < retries) {
@@ -393,11 +383,10 @@ async function getTodo(
       })
     }
 
-    const body = await errore.tryAsync({
-      try: () => response.json(),
-      catch: (e) =>
+    const body = await response.json()
+      .catch((e) =>
         new InvalidJsonError({ id: String(id), cause: e }),
-    })
+      )
 
     if (body instanceof Error) {
       if (attempt < retries) {
@@ -418,11 +407,11 @@ async function getTodo(
 ```
 
 **What changed:**
-- `TimeoutError` is its own class — no more `(error as Error).name === "AbortError"` string checks
-- Timeout detection happens in the `catch` mapper, close to where it originates
-- Timeout is explicitly never retried (`if (response instanceof TimeoutError) return response`) — this policy is visible, not buried in a conditional
+- `TimeoutError extends errore.AbortError` — a typed abort reason instead of `(error as Error).name === "AbortError"` string checks
+- `controller.abort(new TimeoutError(...))` passes a typed reason — the browser's `AbortError` wraps it as the cause, so `errore.isAbortError()` can detect it inside the `RequestFailedError` cause chain
+- Timeout is explicitly never retried (`if (errore.isAbortError(response)) return response`) — this policy is visible, not buried in a conditional
 - Signal listener cleanup with `removeEventListener` and `{ once: true }`
-- The return type `InvalidJsonError | RequestFailedError | TimeoutError | { todo: any }` tells the full story
+- `TimeoutError` doesn't appear in the return type — it's inside `RequestFailedError`'s cause chain, not returned directly
 
 ---
 
@@ -539,6 +528,7 @@ class RequestFailedError extends errore.createTaggedError({
 class TimeoutError extends errore.createTaggedError({
   name: "TimeoutError",
   message: "Request timed out for todo $id",
+  extends: errore.AbortError,
 }) {}
 
 async function getTodo(
@@ -553,7 +543,7 @@ async function getTodo(
     signal?: AbortSignal
   }
 ): Promise<
-  InvalidJsonError | RequestFailedError | TimeoutError | { todo: any }
+  InvalidJsonError | RequestFailedError | { todo: any }
 > {
   return tracer.startActiveSpan(
     "getTodo",
@@ -575,33 +565,28 @@ async function getTodo(
   )
 
   async function execute(): Promise<
-    InvalidJsonError | RequestFailedError | TimeoutError | { todo: any }
+    InvalidJsonError | RequestFailedError | { todo: any }
   > {
     for (let attempt = 0; attempt <= retries; attempt++) {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 1000)
+      const timeout = setTimeout(() => controller.abort(new TimeoutError({ id: String(id) })), 1000)
       const onAbort = () => controller.abort()
       signal?.addEventListener("abort", onAbort, { once: true })
 
-      const response = await errore.tryAsync({
-        try: () =>
-          fetch(`/todos/${id}`, { signal: controller.signal }),
-        catch: (e) => {
-          if (e.name === "AbortError") {
-            return new TimeoutError({ id: String(id), cause: e })
-          }
-          return new RequestFailedError({
+      const response = await fetch(`/todos/${id}`, { signal: controller.signal })
+        .catch((e) =>
+          new RequestFailedError({
             id: String(id),
             attempts: String(attempt + 1),
             cause: e,
-          })
-        },
-      })
+          }),
+        )
 
       clearTimeout(timeout)
       signal?.removeEventListener("abort", onAbort)
 
-      if (response instanceof TimeoutError) return response
+      // Abort errors (timeout) are never retried
+      if (errore.isAbortError(response)) return response
 
       if (response instanceof Error) {
         if (attempt < retries) {
@@ -622,11 +607,10 @@ async function getTodo(
         })
       }
 
-      const body = await errore.tryAsync({
-        try: () => response.json(),
-        catch: (e) =>
+      const body = await response.json()
+        .catch((e) =>
           new InvalidJsonError({ id: String(id), cause: e }),
-      })
+        )
 
       if (body instanceof Error) {
         if (attempt < retries) {
@@ -737,30 +721,22 @@ async function processOrder(
 ): Promise<DbError | CacheError | ProcessingError | Receipt> {
   await using cleanup = new errore.AsyncDisposableStack()
 
-  const db = await errore.tryAsync({
-    try: () => connectDb(),
-    catch: (e) => new DbError({ orderId, cause: e }),
-  })
+  const db = await connectDb()
+    .catch((e) => new DbError({ orderId, cause: e }))
   if (db instanceof Error) return db
   cleanup.defer(() => db.close())
 
-  const cache = await errore.tryAsync({
-    try: () => openCache(),
-    catch: (e) => new CacheError({ orderId, cause: e }),
-  })
+  const cache = await openCache()
+    .catch((e) => new CacheError({ orderId, cause: e }))
   if (cache instanceof Error) return cache
   cleanup.defer(() => cache.flush())
 
-  const order = await errore.tryAsync({
-    try: () => db.query(`SELECT * FROM orders WHERE id = $1`, [orderId]),
-    catch: (e) => new DbError({ orderId, cause: e }),
-  })
+  const order = await db.query(`SELECT * FROM orders WHERE id = $1`, [orderId])
+    .catch((e) => new DbError({ orderId, cause: e }))
   if (order instanceof Error) return order
 
-  const receipt = await errore.tryAsync({
-    try: () => processPayment(order),
-    catch: (e) => new ProcessingError({ orderId, cause: e }),
-  })
+  const receipt = await processPayment(order)
+    .catch((e) => new ProcessingError({ orderId, cause: e }))
   if (receipt instanceof Error) return receipt
 
   await cache.set(`receipt:${orderId}`, receipt)

@@ -101,10 +101,8 @@ async function getUserById(id: string): Promise<User> {
 import * as errore from 'errore'
 
 async function getUserById(id: string): Promise<DbConnectionError | RecordNotFoundError | User> {
-  const result = await errore.tryAsync({
-    try: () => db.query('SELECT * FROM users WHERE id = ?', [id]),
-    catch: (e) => new DbConnectionError({ message: 'Database query failed', cause: e })
-  })
+  const result = await db.query('SELECT * FROM users WHERE id = ?', [id])
+    .catch((e) => new DbConnectionError({ message: 'Database query failed', cause: e }))
   
   if (result instanceof Error) return result
   if (!result) return new RecordNotFoundError({ table: 'users', id })
@@ -180,7 +178,7 @@ app.get('/users/:id', async (req, res) => {
 
 ### Wrapping External Libraries
 
-Use `tryFn` or `tryAsync` to wrap functions that throw:
+Use `errore.try` for sync, `.catch()` for async:
 
 ```ts
 import * as errore from 'errore'
@@ -196,20 +194,16 @@ function parseJson(input: string): ValidationError | unknown {
 
 // Async: fetch wrapper
 async function fetchJson<T>(url: string): Promise<NetworkError | T> {
-  const response = await errore.tryAsync({
-    try: () => fetch(url),
-    catch: (e) => new NetworkError({ url, reason: `Fetch failed: ${e}` })
-  })
+  const response = await fetch(url)
+    .catch((e) => new NetworkError({ url, reason: 'Fetch failed', cause: e }))
   if (response instanceof Error) return response
   
   if (!response.ok) {
     return new NetworkError({ url, reason: `HTTP ${response.status}` })
   }
   
-  const data = await errore.tryAsync({
-    try: () => response.json() as Promise<T>,
-    catch: () => new NetworkError({ url, reason: 'Invalid JSON response' })
-  })
+  const data = await (response.json() as Promise<T>)
+    .catch((e) => new NetworkError({ url, reason: 'Invalid JSON response', cause: e }))
   return data
 }
 ```
@@ -222,10 +216,8 @@ Combine error handling with optional values naturally:
 import * as errore from 'errore'
 
 async function findUserByEmail(email: string): Promise<DbConnectionError | User | null> {
-  const result = await errore.tryAsync({
-    try: () => db.query('SELECT * FROM users WHERE email = ?', [email]),
-    catch: (e) => new DbConnectionError({ message: 'Query failed', cause: e })
-  })
+  const result = await db.query('SELECT * FROM users WHERE email = ?', [email])
+    .catch((e) => new DbConnectionError({ message: 'Query failed', cause: e }))
   
   if (result instanceof Error) return result
   return result ?? null  // explicitly return null if not found

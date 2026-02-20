@@ -26,6 +26,22 @@ console.log(user.username)  // user is User, fully narrowed
 npm install errore
 ```
 
+## LLM Skill
+
+errore ships with a skill file that teaches AI coding agents (Claude Code, Cursor, Windsurf, etc.) how to use the errore convention correctly. Install it with:
+
+```sh
+npx skills add remorses/errore
+```
+
+Then add this line to your project's `AGENTS.md` or `claude.md`:
+
+```
+This codebase uses the errore.org convention. ALWAYS read the errore skill before editing any code.
+```
+
+This ensures the agent reads the full errore philosophy and rules before making changes to your codebase.
+
 ## Quick Start
 
 Define typed errors with **variable interpolation** and return **Error or Value** directly:
@@ -46,10 +62,8 @@ class DbError extends errore.createTaggedError({
 
 // Function returns Error | Value (no wrapper!)
 async function getUser(id: string): Promise<NotFoundError | DbError | User> {
-  const result = await errore.tryAsync({
-    try: () => db.query(id),
-    catch: e => new DbError({ reason: e.message, cause: e })
-  })
+  const result = await db.query(id)
+    .catch((e) => new DbError({ reason: e.message, cause: e }))
   
   if (result instanceof Error) return result
   if (!result) return new NotFoundError({ id })
@@ -355,10 +369,11 @@ const parsed = errore.try({
   catch: e => new ParseError({ reason: e.message, cause: e })
 })
 
-// Async
-const response = await errore.tryAsync(() => fetch(url))
+// Async — prefer .catch() for promises (no wrapper needed)
+const response = await fetch(url)
+  .catch((e) => new NetworkError({ url, cause: e }))
 
-// Async - with custom error
+// Async — errore.tryAsync also works, but .catch() is preferred
 const response = await errore.tryAsync({
   try: () => fetch(url),
   catch: e => new NetworkError({ url, cause: e })
@@ -366,6 +381,8 @@ const response = await errore.tryAsync({
 ```
 
 > **Best practices for `try` / `tryAsync`:**
+> - **For async code, prefer `.catch()`** — `promise.catch((e) => new MyError({ cause: e }))` is simpler and avoids the wrapper. `errore.tryAsync` still works but `.catch()` is the idiomatic choice.
+> - **Use `errore.try` for sync code** — there's no equivalent of `.catch()` for synchronous throwing calls, so `errore.try(() => JSON.parse(input))` is the right tool.
 > - **Use as low as possible in the call stack** — only at boundaries with uncontrolled dependencies (third-party libs, `JSON.parse`, `fetch`, file I/O). Your own functions should return errors as values, never throw.
 > - **Keep the callback minimal** — wrap only the single throwing call, not your business logic. The `try` callback should be a one-liner.
 > - **Always prefer `errore.try` over `errore.tryFn`** — they are the same function, but `try` is the canonical name.
@@ -764,7 +781,7 @@ if (user instanceof Error) return user
 console.log(user.name)
 ```
 
-The `errore` package just provides conveniences: `createTaggedError` for less boilerplate, `matchError` for exhaustive pattern matching, `tryAsync` for catching exceptions. But the core pattern—**errors as union types**—works with zero dependencies.
+The `errore` package just provides conveniences: `createTaggedError` for less boilerplate, `matchError` for exhaustive pattern matching, `try` for catching sync exceptions (and `.catch()` for async promises). But the core pattern—**errors as union types**—works with zero dependencies.
 
 ### Perfect for Libraries
 

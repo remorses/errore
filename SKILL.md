@@ -28,7 +28,7 @@ console.log(user.name)                  // TypeScript knows: User
 1. Always `import * as errore from 'errore'` — namespace import, never destructure
 2. Never throw for expected failures — return errors as values
 3. Never return `unknown | Error` — the union collapses to `unknown`, breaks narrowing
-4. Avoid `try-catch` for control flow — use `errore.tryAsync` / `errore.try` to convert exceptions to values
+4. Avoid `try-catch` for control flow — use `.catch()` for async boundaries, `errore.try` for sync boundaries
 5. Use `createTaggedError` for domain errors — gives you `_tag`, typed properties, `$variable` interpolation, `cause`, `findCause`, `toJSON`, and fingerprinting
 6. Let TypeScript infer return types — only add explicit annotations when they improve readability (complex unions, public APIs) or when inference produces a wider type than intended
 7. Use `cause` to wrap errors — `new MyError({ ..., cause: originalError })`
@@ -36,9 +36,12 @@ console.log(user.name)                  // TypeScript knows: User
 9. Use `const` + expressions, never `let` + try-catch — ternaries, IIFEs, `instanceof Error`
 10. Use early returns, never nested if-else — check error, return, continue flat
 11. Always include `Error` handler in `matchError` — required fallback for plain Error instances
-12. Use `errore.try` / `errore.tryAsync` as low as possible in the call stack — only at boundaries with uncontrolled dependencies (third-party libs, `JSON.parse`, `fetch`, file I/O). Your own code should return errors as values, not throw.
-13. Keep the code inside `errore.try` / `errore.tryAsync` minimal — wrap only the single throwing call, not your business logic. The `try` callback should be a one-liner calling the external dependency.
-14. Always prefer `errore.try` over `errore.tryFn` — they are the same function, but `errore.try` is the canonical name
+12. Use `.catch()` for async boundaries, `errore.try` for sync boundaries — only at the lowest call stack level where you interact with uncontrolled dependencies (third-party libs, `JSON.parse`, `fetch`, file I/O). Your own code should return errors as values, not throw.
+13. Always wrap `.catch()` in a tagged domain error — `.catch((e) => new MyError({ cause: e }))`. The `.catch()` callback receives `any`, but wrapping in a typed error gives the union a concrete type. Never use `.catch((e) => e as Error)` — always wrap.
+14. Always pass `cause` in `.catch()` callbacks — `.catch((e) => new MyError({ cause: e }))`, never `.catch(() => new MyError())`. Without `cause`, the original error is lost and `isAbortError` can't walk the chain to detect aborts. The `cause` preserves the full error chain for debugging and abort detection.
+15. Always prefer `errore.try` over `errore.tryFn` — they are the same function, but `errore.try` is the canonical name
+16. Use `errore.isAbortError` to detect abort errors — never check `error.name === 'AbortError'` manually, because tagged abort errors have their tag as `.name`
+17. Custom abort errors MUST extend `errore.AbortError` — so `isAbortError` detects them in the cause chain even when wrapped by `.catch()`
 
 ## TypeScript Rules
 
@@ -91,13 +94,21 @@ These TypeScript practices complement errore's philosophy:
   const items = results.filter(isTruthy)
   ```
 
-- **`controller.abort(new Error())` not string** — always pass an Error instance to `abort()` so catch blocks receive a real Error with a stack trace, not a string:
+- **`controller.abort()` must use typed errors** — `abort(reason)` throws `reason` as-is. MUST pass a tagged error extending `errore.AbortError`, NEVER `new Error()` or a string — otherwise `isAbortError` can't detect it in the cause chain:
   ```ts
-  // BAD: catch receives a string, not an Error
+  // BAD: plain Error — isAbortError won't recognize it
+  controller.abort(new Error('timeout'))
+
+  // BAD: string — not an Error, breaks instanceof checks
   controller.abort('timeout')
 
-  // GOOD: catch receives an Error instance with cause chain
-  controller.abort(new Error('Request timed out'))
+  // GOOD: tagged error extending AbortError
+  class TimeoutError extends errore.createTaggedError({
+    name: 'TimeoutError',
+    message: 'Request timed out for $operation',
+    extends: errore.AbortError,
+  }) {}
+  controller.abort(new TimeoutError({ operation: 'fetch' }))
   ```
 
 - **Never silently suppress errors in catch blocks** — empty `catch {}` hides failures. With errore you rarely need catch at all, but at boundaries where you must, always handle or log:
@@ -106,10 +117,8 @@ These TypeScript practices complement errore's philosophy:
   try { await sendEmail(user.email) } catch {}
 
   // GOOD: log and continue if non-critical
-  const emailResult = await errore.tryAsync({
-    try: () => sendEmail(user.email),
-    catch: (e) => new EmailError({ email: user.email, cause: e }),
-  })
+  const emailResult = await sendEmail(user.email)
+    .catch((e) => new EmailError({ email: user.email, cause: e }))
   if (emailResult instanceof Error) {
     console.warn('Failed to send email:', emailResult.message)
   }
@@ -229,10 +238,8 @@ async function loadConfig(): Promise<Config> {
 
 // GOOD: flat with errore
 async function loadConfig(): Promise<Config> {
-  const raw = await errore.tryAsync({
-    try: () => fs.readFile('config.json', 'utf-8'),
-    catch: (e) => new ConfigError({ reason: 'Read failed', cause: e }),
-  })
+  const raw = await fs.readFile('config.json', 'utf-8')
+    .catch((e) => new ConfigError({ reason: 'Read failed', cause: e }))
   if (raw instanceof Error) return { port: 3000 }
 
   const parsed = errore.try({
@@ -411,47 +418,43 @@ async function fetchJson(url: string): Promise<any> {
 <!-- good -->
 ```ts
 async function fetchJson<T>(url: string): Promise<NetworkError | T> {
-  const response = await errore.tryAsync({
-    try: () => fetch(url),
-    catch: (e) => new NetworkError({ url, reason: 'Fetch failed', cause: e }),
-  })
+  const response = await fetch(url)
+    .catch((e) => new NetworkError({ url, reason: 'Fetch failed', cause: e }))
   if (response instanceof Error) return response
 
   if (!response.ok) {
     return new NetworkError({ url, reason: `HTTP ${response.status}` })
   }
 
-  const data = await errore.tryAsync({
-    try: () => response.json() as Promise<T>,
-    catch: (e) => new NetworkError({ url, reason: 'Invalid JSON', cause: e }),
-  })
+  const data = await (response.json() as Promise<T>)
+    .catch((e) => new NetworkError({ url, reason: 'Invalid JSON', cause: e }))
   return data
 }
 ```
 
-> `errore.tryAsync` catches exceptions and maps them to typed errors. Use `errore.try` for sync code. The `cause` preserves the original exception.
+> `.catch()` on a promise converts rejections to typed errors. TypeScript infers the union (`Response | NetworkError`) automatically. Use `errore.try` for sync boundaries (`JSON.parse`, etc.).
 
-### try/tryAsync Placement (Boundary Rule)
+### Boundary Rule (.catch for async, errore.try for sync)
 
-`errore.try` and `errore.tryAsync` should only appear at the **lowest level** of your call stack — right at the boundary with code you don't control (third-party libraries, `JSON.parse`, `fetch`, file I/O, etc.). Your own functions should never throw, so they never need to be wrapped in `try`.
+`.catch()` and `errore.try` should only appear at the **lowest level** of your call stack — right at the boundary with code you don't control (third-party libraries, `JSON.parse`, `fetch`, file I/O, etc.). Your own functions should never throw, so they never need `.catch()` or `try`.
 
-Keep the code inside the `try` callback **as small as possible** — ideally a single call to the external dependency. Don't put business logic inside `try`.
+For **async** boundaries: use `.catch((e) => new MyError({ cause: e }))` directly on the promise. TypeScript infers the union automatically.
 
-Always use `errore.try`, never `errore.tryFn` — they are the same function but `errore.try` is the canonical name.
+For **sync** boundaries: use `errore.try({ try: () => ..., catch: (e) => ... })`. Always prefer `errore.try` over `errore.tryFn` — same function, `try` is the canonical name.
+
+The `.catch()` callback receives `any` (Promise rejections are untyped), but wrapping in a typed error gives the union a concrete type — no `as` assertions needed.
 
 <!-- bad -->
 ```ts
-// wrapping too much code inside try — business logic should not be here
+// wrapping too much in a single .catch — business logic should not be here
 async function getUser(id: string): Promise<AppError | User> {
-  return errore.tryAsync({
-    try: async () => {
-      const res = await fetch(`/users/${id}`)
+  return fetch(`/users/${id}`)
+    .then(async (res) => {
       const data = await res.json()
       if (!data.active) throw new Error('inactive')
       return { ...data, displayName: `${data.first} ${data.last}` }
-    },
-    catch: (e) => new AppError({ id, cause: e }),
-  })
+    })
+    .catch((e) => new AppError({ id, cause: e }))
 }
 ```
 
@@ -459,30 +462,24 @@ async function getUser(id: string): Promise<AppError | User> {
 ```ts
 // wrapping your own code that already returns errors as values
 async function processOrder(id: string): Promise<OrderError | Order> {
-  return errore.tryAsync({
-    try: () => createOrder(id),  // createOrder already returns errors!
-    catch: (e) => new OrderError({ id, cause: e }),
-  })
+  return createOrder(id)  // createOrder already returns errors!
+    .catch((e) => new OrderError({ id, cause: e }))
 }
 ```
 
 <!-- good -->
 ```ts
-// try only wraps the external dependency (fetch), nothing else
-async function getUser(id: string): Promise<NetworkError | User> {
-  const res = await errore.tryAsync({
-    try: () => fetch(`/users/${id}`),
-    catch: (e) => new NetworkError({ url: `/users/${id}`, cause: e }),
-  })
+// .catch() only wraps the external dependency, nothing else
+async function getUser(id: string) {
+  const res = await fetch(`/users/${id}`)
+    .catch((e) => new NetworkError({ url: `/users/${id}`, cause: e }))
   if (res instanceof Error) return res
 
-  const data = await errore.tryAsync({
-    try: () => res.json() as Promise<UserPayload>,
-    catch: (e) => new NetworkError({ url: `/users/${id}`, cause: e }),
-  })
+  const data = await (res.json() as Promise<UserPayload>)
+    .catch((e) => new NetworkError({ url: `/users/${id}`, cause: e }))
   if (data instanceof Error) return data
 
-  // business logic is outside try — plain code, not wrapped
+  // business logic is outside .catch — plain code, not wrapped
   if (!data.active) return new InactiveUserError({ id })
   return { ...data, displayName: `${data.first} ${data.last}` }
 }
@@ -490,15 +487,15 @@ async function getUser(id: string): Promise<NetworkError | User> {
 
 <!-- good -->
 ```ts
-// your own functions return errors as values — no try needed
-async function processOrder(id: string): Promise<OrderError | Order> {
+// your own functions return errors as values — no .catch needed
+async function processOrder(id: string) {
   const order = await createOrder(id)
   if (order instanceof Error) return order
   return order
 }
 ```
 
-> Think of `errore.try` / `errore.tryAsync` as the **adapter** between the throwing world (external code) and the errore world (errors as values). Once you've converted exceptions to values at the boundary, everything above is plain `instanceof` checks.
+> Think of `.catch()` and `errore.try` as the **adapter** between the throwing world (external code) and the errore world (errors as values). Once you've converted exceptions to values at the boundary, everything above is plain `instanceof` checks.
 
 ### Optional Values (| null)
 
@@ -514,10 +511,8 @@ async function findUser(email: string): Promise<User | undefined> {
 <!-- good -->
 ```ts
 async function findUser(email: string): Promise<DbError | User | null> {
-  const result = await errore.tryAsync({
-    try: () => db.query(email),
-    catch: (e) => new DbError({ message: 'Query failed', cause: e }),
-  })
+  const result = await db.query(email)
+    .catch((e) => new DbError({ message: 'Query failed', cause: e }))
   if (result instanceof Error) return result
   return result ?? null
 }
@@ -668,17 +663,13 @@ import * as errore from 'errore'
 async function processRequest(id: string): Promise<DbError | Result> {
   await using cleanup = new errore.AsyncDisposableStack()
 
-  const db = await errore.tryAsync({
-    try: () => connectDb(),
-    catch: (e) => new DbError({ cause: e }),
-  })
+  const db = await connectDb()
+    .catch((e) => new DbError({ cause: e }))
   if (db instanceof Error) return db
   cleanup.defer(() => db.close())
 
-  const cache = await errore.tryAsync({
-    try: () => openCache(),
-    catch: (e) => new CacheError({ cause: e }),
-  })
+  const cache = await openCache()
+    .catch((e) => new CacheError({ cause: e }))
   if (cache instanceof Error) return cache
   cleanup.defer(() => cache.flush())
 
@@ -725,10 +716,8 @@ try {
 
 <!-- good -->
 ```ts
-const result = await errore.tryAsync({
-  try: () => externalService.call(id),
-  catch: (e) => new ServiceError({ id, cause: e }),
-})
+const result = await externalService.call(id)
+  .catch((e) => new ServiceError({ id, cause: e }))
 if (result instanceof Error) return result
 return result
 ```
@@ -982,6 +971,56 @@ const user = fetchResult instanceof RecordNotFoundError
 
 > A ternary expression replaces `let` + try-catch + conditional rethrow. One line, no mutation.
 
+### Abort & Cancellation
+
+`controller.abort(reason)` throws `reason` as-is — whatever you pass is what `.catch()` receives. This means you MUST pass a typed error extending `errore.AbortError`, never a plain `Error` or string.
+
+Always use `errore.isAbortError(error)` to detect abort errors. It walks the entire `.cause` chain, so it works even when the abort error is wrapped by `.catch()`.
+
+<!-- bad -->
+```ts
+// Plain Error — isAbortError can't detect it
+controller.abort(new Error('timeout'))
+
+// String — not an Error, breaks instanceof
+controller.abort('timeout')
+```
+
+<!-- good -->
+```ts
+import * as errore from 'errore'
+
+class TimeoutError extends errore.createTaggedError({
+  name: 'TimeoutError',
+  message: 'Request timed out for $operation',
+  extends: errore.AbortError,
+}) {}
+
+// Pass typed error to abort
+const controller = new AbortController()
+const timer = setTimeout(
+  () => controller.abort(new TimeoutError({ operation: 'fetch' })),
+  5000,
+)
+
+const res = await fetch(url, { signal: controller.signal })
+  .catch((e) => new NetworkError({ url, cause: e }))
+clearTimeout(timer)
+
+if (res instanceof Error) {
+  // Check if the underlying cause was an abort
+  if (errore.isAbortError(res)) {
+    const timeout = errore.findCause(res, TimeoutError)
+    if (timeout) console.log(timeout.operation)
+    return res
+  }
+  // Genuine network error
+  return res
+}
+```
+
+> `isAbortError` detects three kinds of abort: (1) native `DOMException` from bare `controller.abort()`, (2) direct `errore.AbortError` instances, (3) tagged errors that extend `errore.AbortError` — even when wrapped in another error's `.cause` chain.
+
 ## Pitfalls
 
 ### unknown | Error collapses to unknown
@@ -1067,10 +1106,14 @@ const result = myFn()
 if (result instanceof Error) return result
 // result is string
 
-// --- Wrap exceptions ---
-const data = await errore.tryAsync({
-  try: () => riskyCall(),
-  catch: (e) => new MyError({ resource: 'api', reason: 'call failed', cause: e }),
+// --- Wrap async exceptions (.catch) ---
+const data = await riskyAsyncCall()
+  .catch((e) => new MyError({ resource: 'api', reason: 'call failed', cause: e }))
+
+// --- Wrap sync exceptions (errore.try) ---
+const parsed = errore.try({
+  try: () => JSON.parse(input),
+  catch: (e) => new MyError({ resource: 'config', reason: 'parse failed', cause: e }),
 })
 
 // --- Check errors (plain instanceof, always) ---
@@ -1091,6 +1134,17 @@ errore.matchError(error, {
 // --- Cause chain ---
 error.findCause(DbError)             // instance method on tagged errors
 errore.findCause(error, DbError)     // standalone function
+
+// --- Abort / Cancellation ---
+class TimeoutError extends errore.createTaggedError({
+  name: 'TimeoutError',
+  message: 'Request timed out for $operation',
+  extends: errore.AbortError,          // MUST extend AbortError
+}) {}
+controller.abort(new TimeoutError({ operation: 'fetch' }))
+
+errore.isAbortError(error)             // true if abort-related (walks cause chain)
+errore.findCause(error, TimeoutError)  // extract the specific abort error
 
 // --- Error properties ---
 err._tag              // 'MyError'
