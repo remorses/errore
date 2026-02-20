@@ -111,27 +111,56 @@ export type FactoryTaggedErrorClass<
 }
 
 /**
- * Parse $variable placeholders from message template.
- * Returns array of variable names found.
+ * Compile a `$variable` message template into a reusable interpolator.
+ *
+ * This parses the template once when creating the error class, then each
+ * constructor call uses a simple loop over pre-parsed segments.
  */
-const parseVariables = (message: string): string[] => {
-  const vars: string[] = []
-  const regex = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g
-  let match
-  while ((match = regex.exec(message)) !== null) {
-    vars.push(match[1])
-  }
-  return vars
-}
+const compileMessageInterpolator = (template: string): {
+  readonly variableNames: string[]
+  readonly interpolate: (values?: Record<string, unknown>) => string
+} => {
+  const variableNames: string[] = []
+  const seenVariables = new Set<string>()
+  const staticParts: string[] = []
+  const placeholders: string[] = []
 
-/**
- * Interpolate variables into message template.
- */
-const interpolateMessage = (template: string, values: Record<string, unknown>): string => {
-  return template.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, varName) => {
-    const value = values[varName]
-    return value !== undefined ? String(value) : `$${varName}`
-  })
+  const regex = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(template)) !== null) {
+    staticParts.push(template.slice(lastIndex, match.index))
+
+    const varName = match[1]
+    placeholders.push(varName)
+
+    if (!seenVariables.has(varName)) {
+      seenVariables.add(varName)
+      variableNames.push(varName)
+    }
+
+    lastIndex = regex.lastIndex
+  }
+
+  staticParts.push(template.slice(lastIndex))
+
+  const interpolate = (values?: Record<string, unknown>): string => {
+    if (!values || placeholders.length === 0) {
+      return template
+    }
+
+    let result = staticParts[0] ?? ''
+    for (let i = 0; i < placeholders.length; i++) {
+      const varName = placeholders[i]!
+      const value = values[varName]
+      result += value !== undefined ? String(value) : `$${varName}`
+      result += staticParts[i + 1] ?? ''
+    }
+    return result
+  }
+
+  return { variableNames, interpolate }
 }
 
 /**
@@ -209,7 +238,7 @@ export function createTaggedError<
 }): FactoryTaggedErrorClass<Name, Msg, InstanceType<BaseClass>> {
   const { name: tag, message: messageTemplate } = opts
   const BaseError = opts.extends ?? Error
-  const varNames = parseVariables(messageTemplate)
+  const { variableNames: varNames, interpolate } = compileMessageInterpolator(messageTemplate)
 
   if (varNames.includes('message')) {
     throw new Error(
@@ -239,7 +268,7 @@ export function createTaggedError<
     }
 
     constructor(args?: Record<string, unknown>) {
-      const interpolatedMessage = args ? interpolateMessage(messageTemplate, args) : messageTemplate
+      const interpolatedMessage = interpolate(args)
       const cause = args && 'cause' in args ? args.cause : undefined
 
       super(interpolatedMessage, cause !== undefined ? { cause } : undefined)

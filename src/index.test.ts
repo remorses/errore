@@ -1098,6 +1098,17 @@ describe('createTaggedError factory', () => {
     expect(err.message).toBe('Error: E1. Details: bad!')
   })
 
+  test('interpolates repeated variables', () => {
+    const RepeatError = createTaggedError({
+      name: 'RepeatError',
+      message: 'Duplicate $id then $id again',
+    })
+
+    const err = new RepeatError({ id: 'abc' })
+
+    expect(err.message).toBe('Duplicate abc then abc again')
+  })
+
   test('instanceof Error works', () => {
     const TestError = createTaggedError({
       name: 'TestError',
