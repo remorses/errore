@@ -26,21 +26,19 @@ console.log(user.username)  // user is User, fully narrowed
 npm install errore
 ```
 
-## LLM Skill
+## Agent Skill
 
-errore ships with a skill file that teaches AI coding agents (Claude Code, Cursor, Windsurf, etc.) how to use the errore convention correctly. Install it with:
+errore ships with a skill file that teaches AI coding agents the errore convention. Install it with:
 
 ```sh
 npx skills add remorses/errore
 ```
 
-Then add this line to your project's `AGENTS.md` or `claude.md`:
+Then add this to your `AGENTS.md`:
 
 ```
 This codebase uses the errore.org convention. ALWAYS read the errore skill before editing any code.
 ```
-
-This ensures the agent reads the full errore philosophy and rules before making changes to your codebase.
 
 ## Quick Start
 

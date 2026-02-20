@@ -146,7 +146,7 @@ const styles = css`
   pre[class*='language-'] {
     grid-column: 2 / -1;
     padding: 0.4rem 0;
-    margin: 0.5rem 0 1rem;
+    margin: 0.25rem 0 1.25rem;
     overflow: visible;
     background: none;
     border: none;
@@ -619,6 +619,12 @@ export function parse(input: string): AST | ParseError
 // Users handle errors with standard instanceof
 // No new dependencies, no new concepts`
 
+// AI Agents skill install
+const codeSkillInstall = `npx skills add remorses/errore`
+
+const codeAgentsMd = `This codebase uses the errore.org convention.
+ALWAYS read the errore skill before editing any code.`
+
 
 
 
@@ -681,6 +687,18 @@ function Page() {
           <p><strong>Expressions instead of blocks.</strong> Error handling stays linear:</p>
 
           <pre class="language-typescript"><code class="language-typescript">${codeExpressionVsBlock}</code></pre>
+
+          <h2>AI Agents</h2>
+
+          <p>errore is perfect for AI coding agents. When an agent writes code with try-catch, errors are invisible—the agent can forget a catch block, swallow an exception, or miss an error path entirely. With errore, <strong>the compiler won't let it</strong>. Every error is in the return type. The agent must handle it with <code>instanceof</code> before it can access the value. Unhandled errors are compile errors, not runtime surprises discovered in production.</p>
+
+          <p>Install the skill file:</p>
+
+          <pre class="language-bash"><code class="language-bash">${codeSkillInstall}</code></pre>
+
+          <p>Then add this to your <code>AGENTS.md</code>:</p>
+
+          <pre class="language-markdown"><code class="language-markdown">${codeAgentsMd}</code></pre>
 
           <p><strong>Better than Go.</strong> This is Go-style error handling—errors as values, not exceptions. But with one key difference: Go's two return values let you ignore the error and use the value anyway. A single union makes that impossible:</p>
 
