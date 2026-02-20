@@ -27,7 +27,7 @@ console.log(user.name)                  // TypeScript knows: User
 
 1. Always `import * as errore from 'errore'` — namespace import, never destructure
 2. Never throw for expected failures — return errors as values
-3. Never return `unknown | Error` — the union collapses to `unknown`, breaks narrowing
+3. Never return `unknown | Error` — the union collapses to `unknown`, breaks narrowing. Common trap: `res.json()` returns `unknown`, so `return await res.json()` makes the return type `MyError | unknown` → `unknown`. Fix: cast with `as` → `return (await res.json()) as User`
 4. Avoid `try-catch` for control flow — use `.catch()` for async boundaries, `errore.try` for sync boundaries
 5. Use `createTaggedError` for domain errors — gives you `_tag`, typed properties, `$variable` interpolation, `cause`, `findCause`, `toJSON`, and fingerprinting
 6. Let TypeScript infer return types — only add explicit annotations when they improve readability (complex unions, public APIs) or when inference produces a wider type than intended
@@ -352,6 +352,20 @@ class NotFoundError extends errore.createTaggedError({
 
 > `createTaggedError` gives you `_tag`, typed `$variable` properties, `cause`, `findCause`, `toJSON`, fingerprinting, and a static `.is()` type guard — all for free.
 
+**Instance properties:**
+```ts
+err._tag              // 'NotFoundError'
+err.id                // 'abc' (from $id)
+err.database          // 'users' (from $database)
+err.message           // 'User abc not found in users'
+err.messageTemplate   // 'User $id not found in $database'
+err.fingerprint       // ['NotFoundError', 'User $id not found in $database']
+err.cause             // original error if wrapped
+err.toJSON()          // structured JSON with all properties
+err.findCause(DbError)// walks .cause chain, returns typed match or undefined
+NotFoundError.is(val) // static type guard
+```
+
 ### Returning Errors
 
 <!-- bad -->
@@ -485,17 +499,7 @@ async function getUser(id: string) {
 }
 ```
 
-<!-- good -->
-```ts
-// your own functions return errors as values — no .catch needed
-async function processOrder(id: string) {
-  const order = await createOrder(id)
-  if (order instanceof Error) return order
-  return order
-}
-```
-
-> Think of `.catch()` and `errore.try` as the **adapter** between the throwing world (external code) and the errore world (errors as values). Once you've converted exceptions to values at the boundary, everything above is plain `instanceof` checks.
+> Think of `.catch()` and `errore.try` as the **adapter** between the throwing world (external code) and the errore world (errors as values). Once you've converted exceptions to values at the boundary, everything above is plain `instanceof` checks. Your own functions return errors as values — they never need `.catch()` or `try`.
 
 ### Optional Values (| null)
 
@@ -525,43 +529,6 @@ console.log(user.name)                   // User
 ```
 
 > `Error | T | null` gives you three distinct states without nesting Result and Option types.
-
-### Sequential Operations
-
-<!-- bad -->
-```ts
-async function createUserWithProfile(input: CreateUserInput): Promise<FullUser> {
-  try {
-    const validated = validateInput(input)
-    const user = await createUser(validated)
-    const profile = await createProfile({ userId: user.id })
-    return { ...user, profile }
-  } catch (e) {
-    console.error('Something failed:', e)
-    throw e
-  }
-}
-```
-
-<!-- good -->
-```ts
-async function createUserWithProfile(
-  input: CreateUserInput,
-): Promise<ValidationError | DbError | FullUser> {
-  const validated = validateInput(input)
-  if (validated instanceof Error) return validated
-
-  const user = await createUser(validated)
-  if (user instanceof Error) return user
-
-  const profile = await createProfile({ userId: user.id })
-  if (profile instanceof Error) return profile
-
-  return { ...user, profile }
-}
-```
-
-> Each step is checked independently. The return type is the union of all possible errors.
 
 ### Parallel Operations
 
@@ -703,27 +670,6 @@ const config = result instanceof Error ? { port: 3000, debug: false } : result
 
 > A ternary on `instanceof Error` replaces `let` + try-catch. Single expression, no mutation, no intermediate state.
 
-### Error Wrapping with Cause
-
-<!-- bad -->
-```ts
-try {
-  return await externalService.call(id)
-} catch (e) {
-  throw new Error(`Service call failed for ${id}: ${e}`)
-}
-```
-
-<!-- good -->
-```ts
-const result = await externalService.call(id)
-  .catch((e) => new ServiceError({ id, cause: e }))
-if (result instanceof Error) return result
-return result
-```
-
-> `cause` preserves the full error chain. The original error's stack trace and properties are accessible via `.cause`. This is Go's `fmt.Errorf("context: %w", err)` pattern.
-
 ### Walking the Cause Chain (findCause)
 
 <!-- bad -->
@@ -747,39 +693,6 @@ const dbErr = errore.findCause(error, DbError)
 ```
 
 > `findCause` checks the error itself first, then walks `.cause` recursively. Returns the matched error with full type inference, or `undefined`. Safe against circular references.
-
-### Retry Logic
-
-<!-- bad -->
-```ts
-let result
-let attempts = 0
-while (attempts < 3) {
-  try {
-    result = await fetchData()
-    break
-  } catch (e) {
-    attempts++
-    if (attempts >= 3) throw e
-    await sleep(1000)
-  }
-}
-```
-
-<!-- good -->
-```ts
-async function fetchWithRetry(): Promise<NetworkError | Data> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const result = await fetchData()
-    if (!(result instanceof Error)) return result
-
-    if (attempt < 2) await sleep(1000 * 2 ** attempt)
-  }
-  return new NetworkError({ url: '/api', reason: 'Failed after 3 attempts' })
-}
-```
-
-> A plain `for` loop with `instanceof Error` replaces recursive execute + throw-to-retry. Each failure point decides independently whether to retry or return.
 
 ### Custom Base Classes
 
@@ -878,99 +791,6 @@ errors.forEach((e) => console.warn('Failed:', e.message))
 
 > `partition` splits an array of `(Error | T)[]` into `[T[], Error[]]`. No manual accumulation.
 
-### Fallback Chain
-
-<!-- bad -->
-```ts
-let config
-try {
-  config = loadFromEnv()
-} catch {
-  try {
-    config = loadFromFile()
-  } catch {
-    config = defaultConfig
-  }
-}
-```
-
-<!-- good -->
-```ts
-const config: Config = (() => {
-  const envConfig = loadFromEnv()
-  if (!(envConfig instanceof Error)) return envConfig
-
-  const fileConfig = loadFromFile()
-  if (!(fileConfig instanceof Error)) return fileConfig
-
-  return defaultConfig
-})()
-```
-
-> An IIFE with early returns replaces nested try-catch. Each source is tried in order, first success wins. All scoped inside a single `const` assignment.
-
-### Input Validation
-
-<!-- bad -->
-```ts
-function validateUser(input: unknown): CreateUserInput {
-  if (!input || typeof input !== 'object') {
-    throw new Error('Invalid input')
-  }
-  const { email, name } = input as Record<string, unknown>
-  if (typeof email !== 'string') throw new Error('Invalid email')
-  if (typeof name !== 'string') throw new Error('Invalid name')
-  return { email, name }
-}
-```
-
-<!-- good -->
-```ts
-function validateUser(input: unknown): ValidationError | CreateUserInput {
-  if (!input || typeof input !== 'object') {
-    return new ValidationError({ field: 'body', reason: 'Invalid request body' })
-  }
-  const { email, name } = input as Record<string, unknown>
-
-  if (typeof email !== 'string' || !email.includes('@')) {
-    return new ValidationError({ field: 'email', reason: 'Invalid email format' })
-  }
-  if (typeof name !== 'string' || name.length < 2) {
-    return new ValidationError({ field: 'name', reason: 'Name must be at least 2 characters' })
-  }
-
-  return { email, name }
-}
-```
-
-> Validation functions return errors instead of throwing. The caller gets a typed error with the exact field and reason.
-
-### Conditional Error Recovery
-
-<!-- bad -->
-```ts
-let user
-try {
-  user = await fetchUser(id)
-} catch (e) {
-  if (e.code === 'NOT_FOUND') {
-    user = await createDefaultUser(id)
-  } else {
-    throw e
-  }
-}
-```
-
-<!-- good -->
-```ts
-const fetchResult = await fetchUser(id)
-const user = fetchResult instanceof RecordNotFoundError
-  ? await createDefaultUser(id)
-  : fetchResult
-```
-
-> A ternary expression replaces `let` + try-catch + conditional rethrow. One line, no mutation.
-
 ### Abort & Cancellation
 
 `controller.abort(reason)` throws `reason` as-is — whatever you pass is what `.catch()` receives. This means you MUST pass a typed error extending `errore.AbortError`, never a plain `Error` or string.
@@ -1023,32 +843,6 @@ if (res instanceof Error) {
 
 ## Pitfalls
 
-### unknown | Error collapses to unknown
-
-```ts
-// BAD: res.json() returns unknown, so the union collapses
-async function fetchUser(id: string) {
-  const res = await fetch(`/users/${id}`)
-  if (!res.ok) return new NotFoundError({ id })
-  return await res.json()  // return type is NotFoundError | unknown → unknown
-}
-
-const user = await fetchUser('123')
-if (user instanceof Error) return user
-user.name  // ERROR: user is still unknown
-
-// GOOD: cast with `as` to give the success path a concrete type
-async function fetchUser(id: string) {
-  const res = await fetch(`/users/${id}`)
-  if (!res.ok) return new NotFoundError({ id })
-  return (await res.json()) as User  // return type is NotFoundError | User
-}
-
-const user = await fetchUser('123')
-if (user instanceof Error) return user
-user.name  // works — user is User
-```
-
 ### CustomError | Error is ambiguous when CustomError extends Error
 
 ```ts
@@ -1059,101 +853,3 @@ type Result = MyCustomError | Error
 // Success types must never extend Error
 ```
 
-### Forgetting Error handler in matchError
-
-```ts
-// BAD: matchError requires Error handler for plain Error instances
-errore.matchError(err, {
-  NotFoundError: (e) => 'not found',
-  // missing Error handler — compile error
-})
-
-// GOOD: always include Error fallback
-errore.matchError(err, {
-  NotFoundError: (e) => 'not found',
-  Error: (e) => `unexpected: ${e.message}`,
-})
-```
-
-## Quick Reference
-
-```ts
-import * as errore from 'errore'
-
-// --- Resource cleanup (Go-like defer) ---
-await using cleanup = new errore.AsyncDisposableStack()
-cleanup.defer(() => db.close())     // runs on scope exit, LIFO order
-cleanup.defer(() => cache.flush())  // this runs first (last in, first out)
-
-// sync version
-using cleanup = new errore.DisposableStack()
-cleanup.defer(() => file.closeSync())
-
-// --- Define errors ---
-class MyError extends errore.createTaggedError({
-  name: 'MyError',
-  message: 'Operation on $resource failed: $reason',
-}) {}
-
-// --- Return errors ---
-function myFn(): MyError | string {
-  if (bad) return new MyError({ resource: 'user', reason: 'not found' })
-  return 'ok'
-}
-
-// --- Early return ---
-const result = myFn()
-if (result instanceof Error) return result
-// result is string
-
-// --- Wrap async exceptions (.catch) ---
-const data = await riskyAsyncCall()
-  .catch((e) => new MyError({ resource: 'api', reason: 'call failed', cause: e }))
-
-// --- Wrap sync exceptions (errore.try) ---
-const parsed = errore.try({
-  try: () => JSON.parse(input),
-  catch: (e) => new MyError({ resource: 'config', reason: 'parse failed', cause: e }),
-})
-
-// --- Check errors (plain instanceof, always) ---
-if (result instanceof Error) return result           // early return
-if (!(result instanceof Error)) console.log(result)  // negated check
-result instanceof MyError                            // narrow to specific error type
-const name = result instanceof Error ? 'unknown' : result.name  // ternary for simple cases
-
-// --- Split arrays ---
-errore.partition(results)             // [values[], errors[]]
-
-// --- Match errors ---
-errore.matchError(error, {
-  MyError: (e) => e.reason,
-  Error: (e) => e.message,           // required fallback
-})
-
-// --- Cause chain ---
-error.findCause(DbError)             // instance method on tagged errors
-errore.findCause(error, DbError)     // standalone function
-
-// --- Abort / Cancellation ---
-class TimeoutError extends errore.createTaggedError({
-  name: 'TimeoutError',
-  message: 'Request timed out for $operation',
-  extends: errore.AbortError,          // MUST extend AbortError
-}) {}
-controller.abort(new TimeoutError({ operation: 'fetch' }))
-
-errore.isAbortError(error)             // true if abort-related (walks cause chain)
-errore.findCause(error, TimeoutError)  // extract the specific abort error
-
-// --- Error properties ---
-err._tag              // 'MyError'
-err.resource          // 'user' (from $resource)
-err.reason            // 'not found' (from $reason)
-err.message           // 'Operation on user failed: not found'
-err.messageTemplate   // 'Operation on $resource failed: $reason'
-err.fingerprint       // ['MyError', 'Operation on $resource failed: $reason']
-err.cause             // original error if wrapped
-err.toJSON()          // structured JSON with all properties
-MyError.is(value)     // static type guard
-```
