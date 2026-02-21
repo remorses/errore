@@ -145,8 +145,33 @@ const compileMessageInterpolator = (template: string): {
 
   staticParts.push(template.slice(lastIndex))
 
+  if (placeholders.length === 0) {
+    return {
+      variableNames,
+      interpolate: () => template,
+    }
+  }
+
+  if (placeholders.length === 1) {
+    const head = staticParts[0] ?? ''
+    const tail = staticParts[1] ?? ''
+    const varName = placeholders[0]!
+    const varLiteral = `$${varName}`
+
+    return {
+      variableNames,
+      interpolate: (values?: Record<string, unknown>) => {
+        if (!values) return template
+        const value = values[varName]
+        return `${head}${value !== undefined ? String(value) : varLiteral}${tail}`
+      },
+    }
+  }
+
+  const placeholderLiterals = placeholders.map((varName) => `$${varName}`)
+
   const interpolate = (values?: Record<string, unknown>): string => {
-    if (!values || placeholders.length === 0) {
+    if (!values) {
       return template
     }
 
@@ -154,7 +179,7 @@ const compileMessageInterpolator = (template: string): {
     for (let i = 0; i < placeholders.length; i++) {
       const varName = placeholders[i]!
       const value = values[varName]
-      result += value !== undefined ? String(value) : `$${varName}`
+      result += value !== undefined ? String(value) : placeholderLiterals[i]!
       result += staticParts[i + 1] ?? ''
     }
     return result
@@ -198,6 +223,15 @@ const compileMessageInterpolator = (template: string): {
  * throw new EmptyError() // no args required
  *
  * @example
+ * // Message omitted — caller provides message at construction time
+ * class AppError extends createTaggedError({
+ *   name: 'AppError',
+ * }) {}
+ *
+ * throw new AppError({ message: 'something went wrong' })
+ * // err.fingerprint is stable across different messages
+ *
+ * @example
  * // With cause for error chaining
  * class WrapperError extends createTaggedError({
  *   name: 'WrapperError',
@@ -229,22 +263,29 @@ const compileMessageInterpolator = (template: string): {
  */
 export function createTaggedError<
   Name extends string,
-  Msg extends string,
+  Msg extends string = '$message',
   BaseClass extends ErrorClass = typeof Error,
 >(opts: {
   name: Name
-  message: Msg
+  message?: Msg
   extends?: BaseClass
 }): FactoryTaggedErrorClass<Name, Msg, InstanceType<BaseClass>> {
-  const { name: tag, message: messageTemplate } = opts
+  const { name: tag } = opts
+  const messageTemplate = (opts.message ?? '$message') as Msg
   const BaseError = opts.extends ?? Error
   const { variableNames: varNames, interpolate } = compileMessageInterpolator(messageTemplate)
 
-  if (varNames.includes('message')) {
-    throw new Error(
-      `createTaggedError(${tag}): template variable $message is reserved and not allowed. `
-        + `Use a different variable name like $reason or $detail.`,
-    )
+  // These variable names conflict with Error internals and would be confusing
+  // if used as template variables (the interpolated value can't be read back
+  // as a property because the internal property wins).
+  const FORBIDDEN_VARS = ['_tag', 'name', 'stack', 'cause'] as const
+  for (const forbidden of FORBIDDEN_VARS) {
+    if (varNames.includes(forbidden)) {
+      throw new Error(
+        `createTaggedError(${tag}): template variable $${forbidden} is reserved and not allowed. `
+          + `Use a different variable name.`,
+      )
+    }
   }
 
   // Use a type assertion to help TypeScript understand the base class
@@ -252,6 +293,7 @@ export function createTaggedError<
 
   // Keys that are managed internally and must not be overwritten by template variables
   const RESERVED_KEYS = new Set(['_tag', 'messageTemplate', 'fingerprint', 'name', 'stack', 'message', 'cause'])
+  const serializableVarNames = varNames.filter((varName) => !RESERVED_KEYS.has(varName))
 
   class Tagged extends TypedBase {
     readonly _tag: Name = tag
@@ -275,8 +317,8 @@ export function createTaggedError<
 
       // Assign all variables as properties, skipping reserved internal keys
       if (args) {
-        for (const varName of varNames) {
-          if (varName in args && !RESERVED_KEYS.has(varName)) {
+        for (const varName of serializableVarNames) {
+          if (varName in args) {
             ;(this as Record<string, unknown>)[varName] = args[varName]
           }
         }
@@ -306,8 +348,8 @@ export function createTaggedError<
         stack: this.stack,
       }
       // Include variable properties
-      for (const varName of varNames) {
-        if (varName in this && !RESERVED_KEYS.has(varName)) {
+      for (const varName of serializableVarNames) {
+        if (varName in this) {
           json[varName] = (this as Record<string, unknown>)[varName]
         }
       }

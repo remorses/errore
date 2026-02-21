@@ -32,6 +32,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "bench": "bun run benchmarks/effect-vs-errore.ts",
+    "bench:create-tagged-error": "bun run benchmarks/create-tagged-error.ts",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy"
   },

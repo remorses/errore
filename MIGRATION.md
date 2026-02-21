@@ -54,7 +54,7 @@ import * as errore from 'errore'
 // Database errors
 class DbConnectionError extends errore.createTaggedError({
   name: 'DbConnectionError',
-  message: '$message',
+
 }) {}
 
 class RecordNotFoundError extends errore.createTaggedError({
@@ -103,10 +103,10 @@ import * as errore from 'errore'
 async function getUserById(id: string): Promise<DbConnectionError | RecordNotFoundError | User> {
   const result = await db.query('SELECT * FROM users WHERE id = ?', [id])
     .catch((e) => new DbConnectionError({ message: 'Database query failed', cause: e }))
-  
+
   if (result instanceof Error) return result
   if (!result) return new RecordNotFoundError({ table: 'users', id })
-  
+
   return result
 }
 ```
@@ -121,7 +121,7 @@ async function getFullUser(id: string): Promise<FullUser> {
     const user = await getUserById(id)
     const profile = await getProfileByUserId(user.id)
     const settings = await getSettingsByUserId(user.id)
-    
+
     return { ...user, profile, settings }
   } catch (e) {
     console.error('Failed to get full user:', e)
@@ -133,8 +133,8 @@ async function getFullUser(id: string): Promise<FullUser> {
 ### After: Early returns (Go-style)
 
 ```ts
-type GetFullUserError = 
-  | DbConnectionError 
+type GetFullUserError =
+  | DbConnectionError
   | RecordNotFoundError
 
 async function getFullUser(id: string): Promise<GetFullUserError | FullUser> {
@@ -160,7 +160,7 @@ import * as errore from 'errore'
 
 app.get('/users/:id', async (req, res) => {
   const user = await getFullUser(req.params.id)
-  
+
   if (user instanceof Error) {
     const response = errore.matchError(user, {
       RecordNotFoundError: (e) => ({ status: 404, body: { error: `${e.table} ${e.id} not found` } }),
@@ -169,7 +169,7 @@ app.get('/users/:id', async (req, res) => {
     })
     return res.status(response.status).json(response.body)
   }
-  
+
   return res.json(user)
 })
 ```
@@ -197,11 +197,11 @@ async function fetchJson<T>(url: string): Promise<NetworkError | T> {
   const response = await fetch(url)
     .catch((e) => new NetworkError({ url, reason: 'Fetch failed', cause: e }))
   if (response instanceof Error) return response
-  
+
   if (!response.ok) {
     return new NetworkError({ url, reason: `HTTP ${response.status}` })
   }
-  
+
   const data = await (response.json() as Promise<T>)
     .catch((e) => new NetworkError({ url, reason: 'Invalid JSON response', cause: e }))
   return data
@@ -218,7 +218,7 @@ import * as errore from 'errore'
 async function findUserByEmail(email: string): Promise<DbConnectionError | User | null> {
   const result = await db.query('SELECT * FROM users WHERE email = ?', [email])
     .catch((e) => new DbConnectionError({ message: 'Query failed', cause: e }))
-  
+
   if (result instanceof Error) return result
   return result ?? null  // explicitly return null if not found
 }
@@ -240,17 +240,17 @@ function validateCreateUser(input: unknown): ValidationError | CreateUserInput {
   if (!input || typeof input !== 'object') {
     return new ValidationError({ field: 'body', reason: 'Invalid request body' })
   }
-  
+
   const { email, name } = input as Record<string, unknown>
-  
+
   if (typeof email !== 'string' || !email.includes('@')) {
     return new ValidationError({ field: 'email', reason: 'Invalid email' })
   }
-  
+
   if (typeof name !== 'string' || name.length < 2) {
     return new ValidationError({ field: 'name', reason: 'Name must be at least 2 characters' })
   }
-  
+
   return { email, name }
 }
 ```
@@ -397,7 +397,7 @@ async function fetchWithRetry(): Promise<NetworkError | Data> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const result = await fetchData()
     if (errore.isOk(result)) return result
-    
+
     if (attempt < 2) await sleep(1000)  // don't sleep on last attempt
   }
   return new NetworkError({ url: '/api', reason: 'Failed after 3 attempts' })
@@ -488,10 +488,10 @@ import * as errore from 'errore'
 async function getWithCache(key: string): Promise<DbError | Data> {
   const cached = cache.get(key)
   if (cached) return cached
-  
+
   const fetched = await fetchFromDb(key)
   if (errore.isOk(fetched)) cache.set(key, fetched)
-  
+
   return fetched
 }
 ```
@@ -530,12 +530,12 @@ import * as errore from 'errore'
 
 function loadConfig(): Config {
   const sources = [loadFromEnv, loadFromFile]
-  
+
   for (const load of sources) {
     const result = load()
     if (errore.isOk(result)) return result
   }
-  
+
   return defaultConfig
 }
 ```

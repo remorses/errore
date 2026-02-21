@@ -397,6 +397,8 @@ class NotFoundError extends errore.createTaggedError({
 ```
 
 > `createTaggedError` gives you `_tag`, typed `$variable` properties, `cause`, `findCause`, `toJSON`, fingerprinting, and a static `.is()` type guard — all for free.
+> Omit `message` to let the caller provide it at construction time: `new MyError({ message: 'details' })`. The fingerprint stays stable.
+> Reserved variable names that cannot be used in templates: `$_tag`, `$name`, `$stack`, `$cause`.
 
 **Instance properties:**
 ```ts

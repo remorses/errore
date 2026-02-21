@@ -955,11 +955,57 @@ describe('unknown value type (lossy union)', () => {
 })
 
 describe('createTaggedError factory', () => {
-  test('forbids $message template variable', () => {
-    expect(() => createTaggedError({
-      name: 'BadTemplateError',
-      message: 'Bad: $message',
-    })).toThrow('$message is reserved')
+  test('allows $message in template for caller-defined messages', () => {
+    const FlexError = createTaggedError({
+      name: 'FlexError',
+      message: 'Error: $message',
+    })
+
+    const err = new FlexError({ message: 'something broke' })
+
+    expect(err.message).toBe('Error: something broke')
+    expect(err._tag).toBe('FlexError')
+    expect(err.messageTemplate).toBe('Error: $message')
+    expect(err.fingerprint).toEqual(['FlexError', 'Error: $message'])
+  })
+
+  test('message defaults to $message when omitted', () => {
+    const SimpleError = createTaggedError({
+      name: 'SimpleError',
+    })
+
+    const err = new SimpleError({ message: 'caller decides the message' })
+
+    expect(err.message).toBe('caller decides the message')
+    expect(err._tag).toBe('SimpleError')
+    expect(err.messageTemplate).toBe('$message')
+    expect(err.fingerprint).toEqual(['SimpleError', '$message'])
+  })
+
+  test('default $message fingerprint is stable across different messages', () => {
+    const SimpleError = createTaggedError({
+      name: 'SimpleError',
+    })
+
+    const err1 = new SimpleError({ message: 'first message' })
+    const err2 = new SimpleError({ message: 'second message' })
+
+    expect(err1.message).not.toBe(err2.message)
+    expect(err1.fingerprint).toEqual(err2.fingerprint)
+    expect(err1.fingerprint).toEqual(['SimpleError', '$message'])
+  })
+
+  test('default $message with cause', () => {
+    const SimpleError = createTaggedError({
+      name: 'SimpleError',
+    })
+
+    const cause = new Error('root cause')
+    const err = new SimpleError({ message: 'wrapping error', cause })
+
+    expect(err.message).toBe('wrapping error')
+    expect(err.cause).toBe(cause)
+    expect(err.stack).toContain('Caused by:')
   })
 
   test('creates error with interpolated message', () => {
@@ -1107,6 +1153,29 @@ describe('createTaggedError factory', () => {
     const err = new RepeatError({ id: 'abc' })
 
     expect(err.message).toBe('Duplicate abc then abc again')
+  })
+
+  test('preserves placeholder when value is undefined', () => {
+    const MissingValueError = createTaggedError({
+      name: 'MissingValueError',
+      message: 'Missing $id in $scope',
+    })
+
+    const args = { id: 'abc' } as unknown as { id: string; scope: string }
+    const err = new MissingValueError(args)
+
+    expect(err.message).toBe('Missing abc in $scope')
+  })
+
+  test('handles adjacent placeholders', () => {
+    const AdjacentError = createTaggedError({
+      name: 'AdjacentError',
+      message: '$a$b$c',
+    })
+
+    const err = new AdjacentError({ a: 'x', b: 'y', c: 'z' })
+
+    expect(err.message).toBe('xyz')
   })
 
   test('instanceof Error works', () => {
@@ -1357,17 +1426,32 @@ describe('reserved key collisions', () => {
     expect(err.message).toBe('Error: user-value')
   })
 
-  test('createTaggedError: template with $name does not corrupt error name', () => {
-    const TestError = createTaggedError({
+  test('createTaggedError: forbids reserved variable $name', () => {
+    expect(() => createTaggedError({
       name: 'TestError',
       message: 'Error for $name',
-    })
+    })).toThrow('$name is reserved')
+  })
 
-    const err = new TestError({ name: 'spoofed' })
+  test('createTaggedError: forbids reserved variable $cause', () => {
+    expect(() => createTaggedError({
+      name: 'TestError',
+      message: 'Error from $cause',
+    })).toThrow('$cause is reserved')
+  })
 
-    expect(err.name).toBe('TestError')
-    expect(err._tag).toBe('TestError')
-    expect(err.message).toBe('Error for spoofed')
+  test('createTaggedError: forbids reserved variable $_tag', () => {
+    expect(() => createTaggedError({
+      name: 'TestError',
+      message: 'Error with $_tag',
+    })).toThrow('$_tag is reserved')
+  })
+
+  test('createTaggedError: forbids reserved variable $stack', () => {
+    expect(() => createTaggedError({
+      name: 'TestError',
+      message: 'Error at $stack',
+    })).toThrow('$stack is reserved')
   })
 })
 

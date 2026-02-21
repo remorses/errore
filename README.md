@@ -62,10 +62,10 @@ class DbError extends errore.createTaggedError({
 async function getUser(id: string): Promise<NotFoundError | DbError | User> {
   const result = await db.query(id)
     .catch((e) => new DbError({ reason: e.message, cause: e }))
-  
+
   if (result instanceof Error) return result
   if (!result) return new NotFoundError({ id })
-  
+
   return result
 }
 
@@ -96,7 +96,7 @@ import * as errore from 'errore'
 // Base class with shared functionality
 class AppError extends Error {
   statusCode: number = 500
-  
+
   toResponse() {
     return { error: this.message, code: this.statusCode }
   }
@@ -117,7 +117,7 @@ class ValidationError extends errore.createTaggedError({
 
 class UnauthorizedError extends errore.createTaggedError({
   name: 'UnauthorizedError',
-  message: '$message',
+
   extends: AppError
 }) {}
 
@@ -130,28 +130,28 @@ async function updateUser(
   if (!session) {
     return new UnauthorizedError({ message: 'Not logged in' })
   }
-  
+
   const user = await db.users.find(userId)
   if (!user) {
     return new NotFoundError({ resource: `User ${userId}` })
   }
-  
+
   if (data.email && !isValidEmail(data.email)) {
     return new ValidationError({ field: 'email', reason: 'Invalid email format' })
   }
-  
+
   return db.users.update(userId, data)
 }
 
 // API handler
 app.post('/users/:id', async (req, res) => {
   const result = await updateUser(req.params.id, req.body)
-  
+
   if (result instanceof Error) {
     // All errors have toResponse() from AppError base
     return res.status(result.statusCode).json(result.toResponse())
   }
-  
+
   return res.json(result)
 })
 ```
@@ -184,6 +184,13 @@ class EmptyError extends errore.createTaggedError({
 }) {}
 new EmptyError()  // no args required
 
+// Message omitted — caller provides it at construction time
+class GenericError extends errore.createTaggedError({
+  name: 'GenericError',
+}) {}
+new GenericError({ message: 'caller decides the message' })
+// fingerprint is stable regardless of what message is passed
+
 // With cause for error chaining
 class WrapperError extends errore.createTaggedError({
   name: 'WrapperError',
@@ -207,6 +214,8 @@ err.statusCode  // 500 (inherited from AppError)
 err instanceof AppError  // true
 ```
 
+**Reserved variable names:** `$_tag`, `$name`, `$stack`, `$cause` cannot be used in message templates — they conflict with Error internals.
+
 ### Error Wrapping and Context
 
 Wrap errors with additional context while **preserving the original error** via `cause`:
@@ -215,11 +224,11 @@ Wrap errors with additional context while **preserving the original error** via 
 // Wrap with context, preserve original in cause
 async function processUser(id: string): Promise<ServiceError | ProcessedUser> {
   const user = await getUser(id)  // returns NotFoundError | User
-  
+
   if (user instanceof Error) {
     return new ServiceError({ id, cause: user })
   }
-  
+
   return process(user)
 }
 
@@ -227,7 +236,7 @@ async function processUser(id: string): Promise<ServiceError | ProcessedUser> {
 const result = await processUser('123')
 if (result instanceof Error) {
   console.log(result.message)  // "Failed to process user 123"
-  
+
   if (result.cause instanceof NotFoundError) {
     console.log(result.cause.id)  // access original error's properties
   }
@@ -295,9 +304,9 @@ This solves the problem where `result.cause instanceof MyError` only checks one 
 
 ```ts
 // A -> B -> C chain
-const c = new DbError({ message: 'connection reset' })
+const c = new DbError({ reason: 'connection reset' })
 const b = new ServiceError({ id: '123', cause: c })
-const a = new ApiError({ message: 'request failed', cause: b })
+const a = new NotFoundError({ id: '456', cause: b })
 
 // Manual check only finds B
 a.cause instanceof DbError  // false — only checks one level
