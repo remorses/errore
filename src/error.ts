@@ -281,7 +281,7 @@ export class AbortError extends Error {
  *   // request was aborted — timeout, user cancel, etc.
  * }
  */
-export function isAbortError(error: unknown): boolean {
+export function isAbortError(error: unknown): error is Error {
   const seen = new Set<Error>()
   let current: unknown = error
   while (current instanceof Error) {

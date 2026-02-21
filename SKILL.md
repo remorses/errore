@@ -42,6 +42,52 @@ console.log(user.name)                  // TypeScript knows: User
 15. Always prefer `errore.try` over `errore.tryFn` — they are the same function, but `errore.try` is the canonical name
 16. Use `errore.isAbortError` to detect abort errors — never check `error.name === 'AbortError'` manually, because tagged abort errors have their tag as `.name`
 17. Custom abort errors MUST extend `errore.AbortError` — so `isAbortError` detects them in the cause chain even when wrapped by `.catch()`
+18. Keep abort checks flat (no nested `if`) — check `isAbortError(result)` first as its own early return, then `result instanceof Error` as a separate early return, then continue on success path at root level. Never nest `isAbortError` inside `instanceof Error`:
+    ```ts
+    // BAD: nested — isAbortError hidden inside instanceof
+    const result = await errore.tryAsync({
+      try: () => fetchData({ signal }),
+      catch: (e) => new FetchError({ cause: e }),
+    })
+    if (result instanceof Error) {
+      if (errore.isAbortError(result)) {
+        return 'Request timed out'
+      }
+      return `Failed: ${result.message}`
+    }
+
+    // GOOD: flat early returns with .catch
+    const result = await fetchData({ signal })
+      .catch((e) => new FetchError({ cause: e }))
+    if (errore.isAbortError(result)) {
+      return 'Request timed out'
+    }
+    if (result instanceof Error) {
+      return `Failed: ${result.message}`
+    }
+    // success path continues here at root level
+    // TS already narrowed `result` to the success type — no reassignment needed
+    ```
+
+19. Don't reassign after error early returns — TypeScript narrows the original variable automatically after `instanceof Error` checks return. A `const narrowed = result` alias is redundant:
+    ```ts
+    // BAD: unnecessary reassignment
+    const result = await fetch(url)
+      .catch((e) => new FetchError({ cause: e }))
+    if (result instanceof Error) {
+      return `Failed: ${result.message}`
+    }
+    const response = result  // pointless — TS already knows result is Response
+    await response.json()
+
+    // GOOD: just keep using the original variable
+    const result = await fetch(url)
+      .catch((e) => new FetchError({ cause: e }))
+    if (result instanceof Error) {
+      return `Failed: ${result.message}`
+    }
+    await result.json()  // TS knows result is Response here
+    ```
 
 ## TypeScript Rules
 
@@ -852,4 +898,3 @@ type Result = MyCustomError | Error
 // instanceof Error matches BOTH — can't distinguish success from failure
 // Success types must never extend Error
 ```
-
