@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.14.0
+
+- Make `message` optional in `createTaggedError` — omitting it defaults to `'$message'`, so callers can pass the message at construction time without defining it in the template
+- Validate reserved variable names (`$_tag`, `$name`, `$stack`, `$cause`) at class creation time — they now throw immediately instead of silently conflicting with Error internals
+- Add `isAbortError` type guard (`error is Error`) so TypeScript narrows the variable after the check without requiring a cast
+- Precompile `createTaggedError` template interpolation at class-creation time using a closure-based interpolator — removes per-instance regex work on the hot path
+- Precompute `serializableVarNames` to skip the `RESERVED_KEYS` filter on every constructor call
+- Add fast paths in `compileMessageInterpolator` for 0 and 1 placeholder templates
+- Harden `createTaggedError` internals: forbid `$message` placeholder (conflicts with the optional-message feature), tighten reserved-key handling for `message`/`cause`, ensure `toJSON` cannot be overridden by template variables
+- Deduplicate cause serialization into shared `serializeCause` helper
+- Fix CLI path resolution to use `fileURLToPath` for cross-platform compatibility
+- Move worker-only packages to `devDependencies`
+- Add SKILL.md Rule 18: keep abort checks flat with `.catch`, never nest `isAbortError` inside `instanceof Error`
+- Add SKILL.md Rule 19: don't reassign after error early returns — TypeScript narrows the original variable automatically
+- Compress SKILL.md by ~22% — remove duplicate pattern sections, merge unique info, preserve all flat control flow guidance
+
 ## 0.13.0
 
 - Add `AbortError` base class and `isAbortError` utility for typed abort/cancellation handling
