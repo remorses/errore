@@ -34,7 +34,7 @@ console.log(user.name)                  // TypeScript knows: User
 7. Use `cause` to wrap errors — `new MyError({ ..., cause: originalError })`
 8. Use `| null` for optional values, not `| undefined` — three-way narrowing: `instanceof Error`, `=== null`, then value
 9. Use `const` + expressions, never `let` + try-catch — ternaries, IIFEs, `instanceof Error`
-10. Use early returns, never nested if-else — check error, return, continue flat
+10. Always handle errors inside `if` branches with early exits, keep the happy path at root — like Go's `if err != nil { return err }`, check the error, exit (return/continue/break), and continue the success path at the top indentation level. This makes the happy path readable top-to-bottom with minimal nesting
 11. Always include `Error` handler in `matchError` — required fallback for plain Error instances
 12. Use `.catch()` for async boundaries, `errore.try` for sync boundaries — only at the lowest call stack level where you interact with uncontrolled dependencies (third-party libs, `JSON.parse`, `fetch`, file I/O). Your own code should return errors as values, not throw.
 13. Always wrap `.catch()` in a tagged domain error — `.catch((e) => new MyError({ cause: e }))`. The `.catch()` callback receives `any`, but wrapping in a typed error gives the union a concrete type. Never use `.catch((e) => e as Error)` — always wrap.
@@ -300,9 +300,97 @@ async function loadConfig(): Promise<Config> {
 }
 ```
 
+### Errors in branches, happy path at root
+
+This is the single most important structural rule. Like Go's `if err != nil`, every `if` block in an errore function should handle an error and exit. The success path never goes inside an `if` — it flows straight down at the root indentation level.
+
+**Go:**
+```go
+user, err := getUser(id)
+if err != nil {
+    return fmt.Errorf("get user: %w", err)
+}
+// user is valid here, at root level
+
+posts, err := getPosts(user.ID)
+if err != nil {
+    return fmt.Errorf("get posts: %w", err)
+}
+// posts is valid here, at root level
+
+return render(user, posts)
+```
+
+**errore (identical structure):**
+```ts
+const user = await getUser(id)
+if (user instanceof Error) return user
+// user is User here, at root level
+
+const posts = await getPosts(user.id)
+if (posts instanceof Error) return posts
+// posts is Post[] here, at root level
+
+return render(user, posts)
+```
+
+The pattern: **call → check error → exit if error → continue at root**. Every step follows this rhythm. The reader scans the left edge of the function to follow the happy path.
+
+**Always handle errors inside `if` blocks, never success logic.** Error handling goes in branches with early exits. Putting success logic inside `if` blocks instead inverts the flow and buries the happy path:
+
+```ts
+// BAD: success logic buried inside if blocks — happy path is nested
+const user = await getUser(id)
+if (!(user instanceof Error)) {
+  const posts = await getPosts(user.id)
+  if (!(posts instanceof Error)) {
+    return render(user, posts)
+  }
+  return posts  // error
+}
+return user  // error
+```
+
+```ts
+// GOOD: errors in branches, happy path at root
+const user = await getUser(id)
+if (user instanceof Error) return user
+
+const posts = await getPosts(user.id)
+if (posts instanceof Error) return posts
+
+return render(user, posts)
+```
+
+Same in loops — error in `if` + `continue`, happy path flat:
+
+```ts
+// BAD: success logic nested inside if
+for (const id of ids) {
+  const item = await fetchItem(id)
+  if (!(item instanceof Error)) {
+    await processItem(item)
+    results.push(item)
+  }
+}
+
+// GOOD: error in branch, continue — happy path stays at root
+for (const id of ids) {
+  const item = await fetchItem(id)
+  if (item instanceof Error) {
+    console.warn('Skipping', id, item.message)
+    continue
+  }
+  await processItem(item)
+  results.push(item)
+}
+```
+
+> **Rule of thumb:** if you see `!(x instanceof Error)` in a condition, you've inverted the pattern. Flip it: check `x instanceof Error`, exit, and continue at root.
+
 ### Keep the happy path at minimum indentation
 
-Structure functions so the success path runs at the root nesting level (zero indentation inside the function body). Error cases are handled at the top of each step and exit early. The reader scans down the left edge to follow the main logic:
+Structure functions so the success path runs at the root nesting level (minimal indentation inside the function body). Error cases are handled at the top of each step and exit early. The reader scans down the left edge to follow the main logic — just like reading a Go function where `if err != nil` blocks are speed bumps you skip over, and the real logic is everything else:
 
 ```ts
 async function handleRequest(req: Request): Promise<AppError | Response> {
@@ -322,7 +410,7 @@ async function handleRequest(req: Request): Promise<AppError | Response> {
 }
 ```
 
-> Every line of actual logic is at nesting level 1 (the function body). Error checks are short, self-contained, and exit immediately. No `else`, no `try-catch`, no nesting.
+> Every line of actual logic is at nesting level 1 (the function body). Error handling always lives inside `if` blocks — short, self-contained, and exiting immediately. No `else`, no `try-catch`, no nesting.
 
 ## Patterns
 
