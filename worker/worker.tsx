@@ -699,17 +699,17 @@ function Page() {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Errore - Errors as Values in TypeScript</title>
-        <meta name="description" content="A manifesto for type-safe error handling in TypeScript. Errors as values, not exceptions." />
-        <meta property="og:title" content="Errore - Errors as Values" />
-        <meta property="og:description" content="A manifesto for type-safe error handling in TypeScript. Errors as values, not exceptions." />
+        <meta name="description" content="Go-style error handling for TypeScript. Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks." />
+        <meta property="og:title" content="Errore - Go-style Error Handling for TypeScript" />
+        <meta property="og:description" content="Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks. Type-safe, zero runtime overhead." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://errore.org" />
         <meta property="og:image" content="https://errore.org/og-image.jpg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Errore - Errors as Values" />
-        <meta name="twitter:description" content="A manifesto for type-safe error handling in TypeScript. Errors as values, not exceptions." />
+        <meta name="twitter:title" content="Errore - Go-style Error Handling for TypeScript" />
+        <meta name="twitter:description" content="Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks. Type-safe, zero runtime overhead." />
         <meta name="twitter:image" content="https://errore.org/og-image.jpg" />
         <meta name="twitter:image:alt" content="Errore - Type-safe errors as values for TypeScript" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -723,9 +723,9 @@ function Page() {
         <main>
           <span class="tag">Manifesto</span>
           <h1>Errors as Values in TypeScript</h1>
-          <p class="subtitle">No wrappers. No exceptions. Just unions.</p>
+          <p class="subtitle">Go-style error handling for TypeScript. Unions instead of tuples. <code>instanceof</code> instead of nil checks.</p>
 
-          <p><span class="intro-letter">E</span>rrors are not exceptional—they are inevitable. Instead of throwing exceptions and hoping someone catches them, return errors as values. Make them part of the type signature. Let the compiler enforce that every error is handled.</p>
+          <p><span class="intro-letter">I</span>n Go, functions return errors as values instead of throwing exceptions. errore brings the same convention to TypeScript—but instead of Go's two-value tuple (<code>val, err</code>), you return a single <code>Error | T</code> union. Instead of checking <code>err != nil</code>, you check <code>instanceof Error</code>. TypeScript narrows the type automatically. Forget to check and your code won't compile.</p>
 
           <pre class="language-typescript"><code class="language-typescript">${codeHook}</code></pre>
 

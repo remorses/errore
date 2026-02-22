@@ -1,10 +1,10 @@
 # errore
 
-Type-safe errors as values for TypeScript. Like Go, but with full type inference.
+Type-safe error handling for TypeScript. Return errors instead of throwing them — as a union type (`Error | T`), not a wrapper. TypeScript's type narrowing does the rest: forget to handle an error and your code won't compile.
 
 ## Why?
 
-Instead of wrapping values in a `Result<T, E>` type, functions simply return `E | T`. TypeScript's **type narrowing** handles the rest:
+In Go, functions return errors as values instead of throwing exceptions. errore brings the same convention to TypeScript — but instead of a tuple with two separate variables, functions return a single `Error | T` union. You check `instanceof Error` instead of `err != nil`, and TypeScript narrows the type automatically. No wrapper types like `Result<T, E>`, no monads — just plain unions and `instanceof`:
 
 ```ts
 // Go-style: errors as values
