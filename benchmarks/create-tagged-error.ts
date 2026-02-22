@@ -2,7 +2,8 @@
 import { bench, do_not_optimize, group, run, summary } from 'mitata'
 import { createTaggedError } from '../src/factory.js'
 
-const complexTemplate = 'Failed $operation for $id at $path with $reason (code $code)'
+const complexTemplate =
+  'Failed $operation for $id at $path with $reason (code $code)'
 
 const complexArgs = {
   operation: 'fetch',
@@ -14,10 +15,13 @@ const complexArgs = {
 
 class RegexReplaceError extends Error {
   constructor(args: Record<string, unknown>) {
-    const message = complexTemplate.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, varName: string) => {
-      const value = args[varName]
-      return value !== undefined ? String(value) : `$${varName}`
-    })
+    const message = complexTemplate.replace(
+      /\$([a-zA-Z_][a-zA-Z0-9_]*)/g,
+      (_, varName: string) => {
+        const value = args[varName]
+        return value !== undefined ? String(value) : `$${varName}`
+      },
+    )
     super(message)
     Object.setPrototypeOf(this, new.target.prototype)
     this.name = 'RegexReplaceError'
@@ -50,7 +54,9 @@ group('createTaggedError interpolation', () => {
     })
 
     bench('compiled interpolator (1 placeholder)', () => {
-      do_not_optimize(new SinglePlaceholderError({ message: 'upstream timeout' }))
+      do_not_optimize(
+        new SinglePlaceholderError({ message: 'upstream timeout' }),
+      )
     })
 
     bench('compiled interpolator (0 placeholders)', () => {

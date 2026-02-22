@@ -130,8 +130,7 @@ group('Sync loop — skip errors, collect successes', () => {
         })
         do_not_optimize(Effect.runSync(program))
       }
-    })
-      .args('n', SIZES)
+    }).args('n', SIZES)
 
     // ── errore with instanceof in a for loop ───────────────────────────────
     bench('errore (instanceof)', function* (state) {
@@ -149,8 +148,7 @@ group('Sync loop — skip errors, collect successes', () => {
         }
         do_not_optimize(results)
       }
-    })
-      .args('n', SIZES)
+    }).args('n', SIZES)
 
     // ── Effect.forEach (idiomatic batch) ───────────────────────────────────
     bench('Effect.forEach', function* (state) {
@@ -159,10 +157,7 @@ group('Sync loop — skip errors, collect successes', () => {
 
       yield () => {
         const program = Effect.forEach(ids, (id) =>
-          effFetchUser(id).pipe(
-            Effect.flatMap(effValidateUser),
-            Effect.either,
-          ),
+          effFetchUser(id).pipe(Effect.flatMap(effValidateUser), Effect.either),
         ).pipe(
           Effect.map((results) =>
             results.reduce<User[]>((acc, r) => {
@@ -173,8 +168,7 @@ group('Sync loop — skip errors, collect successes', () => {
         )
         do_not_optimize(Effect.runSync(program))
       }
-    })
-      .args('n', SIZES)
+    }).args('n', SIZES)
   })
 })
 
@@ -198,17 +192,14 @@ group('Sync loop — short-circuit on first error', () => {
           }
           return results
         }).pipe(
-          Effect.catchTag('NotFoundError', () =>
-            Effect.succeed([] as User[]),
-          ),
+          Effect.catchTag('NotFoundError', () => Effect.succeed([] as User[])),
           Effect.catchTag('ValidationError', () =>
             Effect.succeed([] as User[]),
           ),
         )
         do_not_optimize(Effect.runSync(program))
       }
-    })
-      .args('n', SIZES)
+    }).args('n', SIZES)
 
     bench('errore (instanceof)', function* (state) {
       const n = state.get('n')
@@ -231,8 +222,7 @@ group('Sync loop — short-circuit on first error', () => {
         }
         do_not_optimize(results)
       }
-    })
-      .args('n', SIZES)
+    }).args('n', SIZES)
   })
 })
 
@@ -260,8 +250,7 @@ group('Async loop — skip errors, collect successes', () => {
         })
         do_not_optimize(await Effect.runPromise(program))
       }
-    })
-      .args('n', SIZES)
+    }).args('n', SIZES)
 
     // ── errore async with instanceof ───────────────────────────────────────
     bench('errore async (instanceof)', function* (state) {
@@ -279,8 +268,7 @@ group('Async loop — skip errors, collect successes', () => {
         }
         do_not_optimize(results)
       }
-    })
-      .args('n', SIZES)
+    }).args('n', SIZES)
 
     // ── Effect.forEach async ───────────────────────────────────────────────
     bench('Effect.forEach async', function* (state) {
@@ -303,8 +291,7 @@ group('Async loop — skip errors, collect successes', () => {
         )
         do_not_optimize(await Effect.runPromise(program))
       }
-    })
-      .args('n', SIZES)
+    }).args('n', SIZES)
   })
 })
 

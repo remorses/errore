@@ -5,18 +5,37 @@ export type { Errore, InferError, InferValue, EnsureNotError } from './types.js'
 export { isError, isOk, tryFn, tryFn as try, tryAsync } from './core.js'
 
 // Transformations
-export { map, mapError, andThen, andThenAsync, tap, tapAsync } from './transform.js'
+export {
+  map,
+  mapError,
+  andThen,
+  andThenAsync,
+  tap,
+  tapAsync,
+} from './transform.js'
 
 // Extraction
 export { unwrap, unwrapOr, match, partition, flatten } from './extract.js'
 
 // Tagged errors
-export { TaggedError, matchError, matchErrorPartial, isTaggedError, UnhandledError, findCause, AbortError, isAbortError } from './error.js'
+export {
+  TaggedError,
+  matchError,
+  matchErrorPartial,
+  isTaggedError,
+  UnhandledError,
+  findCause,
+  AbortError,
+  isAbortError,
+} from './error.js'
 export type { TaggedErrorInstance, TaggedErrorClass } from './error.js'
 
 // Factory API for tagged errors with $variable interpolation
 export { createTaggedError } from './factory.js'
-export type { FactoryTaggedErrorClass, FactoryTaggedErrorInstance } from './factory.js'
+export type {
+  FactoryTaggedErrorClass,
+  FactoryTaggedErrorInstance,
+} from './factory.js'
 
 // Resource management (DisposableStack polyfills)
 export { DisposableStack, AsyncDisposableStack } from './disposable.js'

@@ -9,9 +9,15 @@ describe('DisposableStack', () => {
   test('defer runs callbacks in LIFO order', () => {
     const order: number[] = []
     const stack = new DisposableStack()
-    stack.defer(() => { order.push(1) })
-    stack.defer(() => { order.push(2) })
-    stack.defer(() => { order.push(3) })
+    stack.defer(() => {
+      order.push(1)
+    })
+    stack.defer(() => {
+      order.push(2)
+    })
+    stack.defer(() => {
+      order.push(3)
+    })
     stack[Symbol.dispose]()
     expect(order).toMatchInlineSnapshot(`
       [
@@ -25,7 +31,9 @@ describe('DisposableStack', () => {
   test('dispose() is an alias for Symbol.dispose', () => {
     const order: number[] = []
     const stack = new DisposableStack()
-    stack.defer(() => { order.push(1) })
+    stack.defer(() => {
+      order.push(1)
+    })
     stack.dispose()
     expect(order).toMatchInlineSnapshot(`
       [
@@ -44,7 +52,9 @@ describe('DisposableStack', () => {
   test('double dispose is a no-op', () => {
     let count = 0
     const stack = new DisposableStack()
-    stack.defer(() => { count++ })
+    stack.defer(() => {
+      count++
+    })
     stack[Symbol.dispose]()
     stack[Symbol.dispose]()
     expect(count).toBe(1)
@@ -86,7 +96,9 @@ describe('DisposableStack', () => {
   test('adopt() registers a value with custom cleanup', () => {
     const log: string[] = []
     const stack = new DisposableStack()
-    const handle = stack.adopt(42, (v) => { log.push(`cleaned ${v}`) })
+    const handle = stack.adopt(42, (v) => {
+      log.push(`cleaned ${v}`)
+    })
     expect(handle).toBe(42)
     stack[Symbol.dispose]()
     expect(log).toMatchInlineSnapshot(`
@@ -99,8 +111,12 @@ describe('DisposableStack', () => {
   test('move() transfers ownership to a new stack', () => {
     const log: string[] = []
     const stack = new DisposableStack()
-    stack.defer(() => { log.push('a') })
-    stack.defer(() => { log.push('b') })
+    stack.defer(() => {
+      log.push('a')
+    })
+    stack.defer(() => {
+      log.push('b')
+    })
 
     const newStack = stack.move()
     expect(stack.disposed).toBe(true)
@@ -129,11 +145,15 @@ describe('DisposableStack', () => {
   test('errors in disposers: first error is thrown, all disposers still run', () => {
     const log: string[] = []
     const stack = new DisposableStack()
-    stack.defer(() => { log.push('a') })
+    stack.defer(() => {
+      log.push('a')
+    })
     stack.defer(() => {
       throw new Error('boom')
     })
-    stack.defer(() => { log.push('c') })
+    stack.defer(() => {
+      log.push('c')
+    })
     expect(() => stack[Symbol.dispose]()).toThrow('boom')
     // All disposers ran despite the error
     expect(log).toMatchInlineSnapshot(`
@@ -176,7 +196,9 @@ describe('DisposableStack', () => {
     const log: string[] = []
     function doWork() {
       using stack = new DisposableStack()
-      stack.defer(() => { log.push('cleaned up') })
+      stack.defer(() => {
+        log.push('cleaned up')
+      })
       log.push('working')
     }
     doWork()
@@ -192,7 +214,9 @@ describe('DisposableStack', () => {
     const log: string[] = []
     function doWork(shouldReturn: boolean): string {
       using stack = new DisposableStack()
-      stack.defer(() => { log.push('cleanup') })
+      stack.defer(() => {
+        log.push('cleanup')
+      })
       if (shouldReturn) return 'early'
       return 'normal'
     }
@@ -208,7 +232,9 @@ describe('DisposableStack', () => {
     const log: string[] = []
     function doWork() {
       using stack = new DisposableStack()
-      stack.defer(() => { log.push('cleanup') })
+      stack.defer(() => {
+        log.push('cleanup')
+      })
       throw new Error('oops')
     }
     expect(() => doWork()).toThrow('oops')
@@ -228,9 +254,15 @@ describe('AsyncDisposableStack', () => {
   test('defer runs async callbacks in LIFO order', async () => {
     const order: number[] = []
     const stack = new AsyncDisposableStack()
-    stack.defer(async () => { order.push(1) })
-    stack.defer(async () => { order.push(2) })
-    stack.defer(async () => { order.push(3) })
+    stack.defer(async () => {
+      order.push(1)
+    })
+    stack.defer(async () => {
+      order.push(2)
+    })
+    stack.defer(async () => {
+      order.push(3)
+    })
     await stack[Symbol.asyncDispose]()
     expect(order).toMatchInlineSnapshot(`
       [
@@ -244,7 +276,9 @@ describe('AsyncDisposableStack', () => {
   test('disposeAsync() is an alias for Symbol.asyncDispose', async () => {
     const order: number[] = []
     const stack = new AsyncDisposableStack()
-    stack.defer(async () => { order.push(1) })
+    stack.defer(async () => {
+      order.push(1)
+    })
     await stack.disposeAsync()
     expect(order).toMatchInlineSnapshot(`
       [
@@ -263,7 +297,9 @@ describe('AsyncDisposableStack', () => {
   test('double dispose is a no-op', async () => {
     let count = 0
     const stack = new AsyncDisposableStack()
-    stack.defer(async () => { count++ })
+    stack.defer(async () => {
+      count++
+    })
     await stack[Symbol.asyncDispose]()
     await stack[Symbol.asyncDispose]()
     expect(count).toBe(1)
@@ -278,7 +314,9 @@ describe('AsyncDisposableStack', () => {
   test('defer accepts sync callbacks', async () => {
     const log: string[] = []
     const stack = new AsyncDisposableStack()
-    stack.defer(() => { log.push('sync cleanup') })
+    stack.defer(() => {
+      log.push('sync cleanup')
+    })
     await stack[Symbol.asyncDispose]()
     expect(log).toMatchInlineSnapshot(`
       [
@@ -332,7 +370,9 @@ describe('AsyncDisposableStack', () => {
   test('adopt() registers a value with async cleanup', async () => {
     const log: string[] = []
     const stack = new AsyncDisposableStack()
-    const handle = stack.adopt('conn', async (v) => { log.push(`closed ${v}`) })
+    const handle = stack.adopt('conn', async (v) => {
+      log.push(`closed ${v}`)
+    })
     expect(handle).toBe('conn')
     await stack[Symbol.asyncDispose]()
     expect(log).toMatchInlineSnapshot(`
@@ -345,8 +385,12 @@ describe('AsyncDisposableStack', () => {
   test('move() transfers ownership to a new stack', async () => {
     const log: string[] = []
     const stack = new AsyncDisposableStack()
-    stack.defer(async () => { log.push('a') })
-    stack.defer(async () => { log.push('b') })
+    stack.defer(async () => {
+      log.push('a')
+    })
+    stack.defer(async () => {
+      log.push('b')
+    })
 
     const newStack = stack.move()
     expect(stack.disposed).toBe(true)
@@ -367,11 +411,15 @@ describe('AsyncDisposableStack', () => {
   test('errors in async disposers: all disposers still run', async () => {
     const log: string[] = []
     const stack = new AsyncDisposableStack()
-    stack.defer(async () => { log.push('a') })
+    stack.defer(async () => {
+      log.push('a')
+    })
     stack.defer(async () => {
       throw new Error('async boom')
     })
-    stack.defer(async () => { log.push('c') })
+    stack.defer(async () => {
+      log.push('c')
+    })
     await expect(stack[Symbol.asyncDispose]()).rejects.toThrow('async boom')
     expect(log).toMatchInlineSnapshot(`
       [
@@ -385,7 +433,9 @@ describe('AsyncDisposableStack', () => {
     const log: string[] = []
     async function doWork() {
       await using stack = new AsyncDisposableStack()
-      stack.defer(async () => { log.push('cleaned up') })
+      stack.defer(async () => {
+        log.push('cleaned up')
+      })
       log.push('working')
     }
     await doWork()
@@ -401,7 +451,9 @@ describe('AsyncDisposableStack', () => {
     const log: string[] = []
     async function doWork(shouldReturn: boolean): Promise<string> {
       await using stack = new AsyncDisposableStack()
-      stack.defer(async () => { log.push('cleanup') })
+      stack.defer(async () => {
+        log.push('cleanup')
+      })
       if (shouldReturn) return 'early'
       return 'normal'
     }
@@ -417,7 +469,9 @@ describe('AsyncDisposableStack', () => {
     const log: string[] = []
     async function doWork() {
       await using stack = new AsyncDisposableStack()
-      stack.defer(async () => { log.push('cleanup') })
+      stack.defer(async () => {
+        log.push('cleanup')
+      })
       throw new Error('oops')
     }
     await expect(doWork()).rejects.toThrow('oops')

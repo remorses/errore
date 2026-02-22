@@ -5,6 +5,7 @@ This guide shows how to migrate a TypeScript codebase from try-catch exceptions 
 ## Philosophy
 
 Instead of:
+
 ```ts
 try {
   const user = await fetchUser(id)
@@ -17,9 +18,10 @@ try {
 ```
 
 You write:
+
 ```ts
 const user = await fetchUser(id)
-if (user instanceof Error) return user  // early return, like Go
+if (user instanceof Error) return user // early return, like Go
 
 const posts = await fetchPosts(user.id)
 if (posts instanceof Error) return posts
@@ -54,7 +56,6 @@ import * as errore from 'errore'
 // Database errors
 class DbConnectionError extends errore.createTaggedError({
   name: 'DbConnectionError',
-
 }) {}
 
 class RecordNotFoundError extends errore.createTaggedError({
@@ -100,9 +101,15 @@ async function getUserById(id: string): Promise<User> {
 ```ts
 import * as errore from 'errore'
 
-async function getUserById(id: string): Promise<DbConnectionError | RecordNotFoundError | User> {
-  const result = await db.query('SELECT * FROM users WHERE id = ?', [id])
-    .catch((e) => new DbConnectionError({ message: 'Database query failed', cause: e }))
+async function getUserById(
+  id: string,
+): Promise<DbConnectionError | RecordNotFoundError | User> {
+  const result = await db
+    .query('SELECT * FROM users WHERE id = ?', [id])
+    .catch(
+      (e) =>
+        new DbConnectionError({ message: 'Database query failed', cause: e }),
+    )
 
   if (result instanceof Error) return result
   if (!result) return new RecordNotFoundError({ table: 'users', id })
@@ -133,9 +140,7 @@ async function getFullUser(id: string): Promise<FullUser> {
 ### After: Early returns (Go-style)
 
 ```ts
-type GetFullUserError =
-  | DbConnectionError
-  | RecordNotFoundError
+type GetFullUserError = DbConnectionError | RecordNotFoundError
 
 async function getFullUser(id: string): Promise<GetFullUserError | FullUser> {
   const user = await getUserById(id)
@@ -163,8 +168,14 @@ app.get('/users/:id', async (req, res) => {
 
   if (user instanceof Error) {
     const response = errore.matchError(user, {
-      RecordNotFoundError: (e) => ({ status: 404, body: { error: `${e.table} ${e.id} not found` } }),
-      DbConnectionError: (e) => ({ status: 500, body: { error: 'Database error' } }),
+      RecordNotFoundError: (e) => ({
+        status: 404,
+        body: { error: `${e.table} ${e.id} not found` },
+      }),
+      DbConnectionError: (e) => ({
+        status: 500,
+        body: { error: 'Database error' },
+      }),
       Error: (e) => ({ status: 500, body: { error: 'Unexpected error' } }),
     })
     return res.status(response.status).json(response.body)
@@ -187,23 +198,25 @@ import * as errore from 'errore'
 function parseJson(input: string): ValidationError | unknown {
   const result = errore.try({
     try: () => JSON.parse(input),
-    catch: () => new ValidationError({ field: 'json', reason: 'Invalid JSON' })
+    catch: () => new ValidationError({ field: 'json', reason: 'Invalid JSON' }),
   })
   return result
 }
 
 // Async: fetch wrapper
 async function fetchJson<T>(url: string): Promise<NetworkError | T> {
-  const response = await fetch(url)
-    .catch((e) => new NetworkError({ url, reason: 'Fetch failed', cause: e }))
+  const response = await fetch(url).catch(
+    (e) => new NetworkError({ url, reason: 'Fetch failed', cause: e }),
+  )
   if (response instanceof Error) return response
 
   if (!response.ok) {
     return new NetworkError({ url, reason: `HTTP ${response.status}` })
   }
 
-  const data = await (response.json() as Promise<T>)
-    .catch((e) => new NetworkError({ url, reason: 'Invalid JSON response', cause: e }))
+  const data = await (response.json() as Promise<T>).catch(
+    (e) => new NetworkError({ url, reason: 'Invalid JSON response', cause: e }),
+  )
   return data
 }
 ```
@@ -215,12 +228,15 @@ Combine error handling with optional values naturally:
 ```ts
 import * as errore from 'errore'
 
-async function findUserByEmail(email: string): Promise<DbConnectionError | User | null> {
-  const result = await db.query('SELECT * FROM users WHERE email = ?', [email])
+async function findUserByEmail(
+  email: string,
+): Promise<DbConnectionError | User | null> {
+  const result = await db
+    .query('SELECT * FROM users WHERE email = ?', [email])
     .catch((e) => new DbConnectionError({ message: 'Query failed', cause: e }))
 
   if (result instanceof Error) return result
-  return result ?? null  // explicitly return null if not found
+  return result ?? null // explicitly return null if not found
 }
 
 // Caller
@@ -238,7 +254,10 @@ if (user === null) {
 ```ts
 function validateCreateUser(input: unknown): ValidationError | CreateUserInput {
   if (!input || typeof input !== 'object') {
-    return new ValidationError({ field: 'body', reason: 'Invalid request body' })
+    return new ValidationError({
+      field: 'body',
+      reason: 'Invalid request body',
+    })
   }
 
   const { email, name } = input as Record<string, unknown>
@@ -248,7 +267,10 @@ function validateCreateUser(input: unknown): ValidationError | CreateUserInput {
   }
 
   if (typeof name !== 'string' || name.length < 2) {
-    return new ValidationError({ field: 'name', reason: 'Name must be at least 2 characters' })
+    return new ValidationError({
+      field: 'name',
+      reason: 'Name must be at least 2 characters',
+    })
   }
 
   return { email, name }
@@ -261,7 +283,7 @@ function validateCreateUser(input: unknown): ValidationError | CreateUserInput {
 import * as errore from 'errore'
 
 async function createUserWithProfile(
-  input: CreateUserInput
+  input: CreateUserInput,
 ): Promise<ValidationError | DbConnectionError | User> {
   // Validate
   const validated = validateCreateUser(input)
@@ -290,7 +312,7 @@ async function createUserWithProfile(
 
 ```ts
 async function getUserDashboard(
-  userId: string
+  userId: string,
 ): Promise<DbConnectionError | RecordNotFoundError | Dashboard> {
   // Fetch in parallel
   const [userResult, postsResult, statsResult] = await Promise.all([
@@ -319,30 +341,33 @@ A common pattern is declaring a variable with `let`, then assigning inside try-c
 #### Pattern 1: Fallback value on error
 
 **Before:**
+
 ```ts
-let config;
+let config
 try {
   config = JSON.parse(fs.readFileSync('config.json', 'utf-8'))
 } catch (e) {
-  config = { port: 3000, debug: false }  // fallback
+  config = { port: 3000, debug: false } // fallback
 }
 ```
 
 **After:** Use `errore.unwrapOr` for a one-liner
+
 ```ts
 import * as errore from 'errore'
 
 const config = errore.unwrapOr(
   errore.try(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
-  { port: 3000, debug: false }
+  { port: 3000, debug: false },
 )
 ```
 
 #### Pattern 2: Different fallback logic based on error
 
 **Before:**
+
 ```ts
-let user;
+let user
 try {
   user = await fetchUser(id)
 } catch (e) {
@@ -355,11 +380,13 @@ try {
 ```
 
 **After:** Use `instanceof` + conditional
+
 ```ts
 const fetchResult = await fetchUser(id)
-const user = fetchResult instanceof RecordNotFoundError
-  ? await createDefaultUser(id)
-  : fetchResult
+const user =
+  fetchResult instanceof RecordNotFoundError
+    ? await createDefaultUser(id)
+    : fetchResult
 
 // Or more explicitly:
 const user = (() => {
@@ -374,9 +401,10 @@ const user = (() => {
 #### Pattern 3: Retry on failure
 
 **Before:**
+
 ```ts
-let result;
-let attempts = 0;
+let result
+let attempts = 0
 while (attempts < 3) {
   try {
     result = await fetchData()
@@ -390,6 +418,7 @@ while (attempts < 3) {
 ```
 
 **After:** Loop with early break
+
 ```ts
 import * as errore from 'errore'
 
@@ -398,7 +427,7 @@ async function fetchWithRetry(): Promise<NetworkError | Data> {
     const result = await fetchData()
     if (errore.isOk(result)) return result
 
-    if (attempt < 2) await sleep(1000)  // don't sleep on last attempt
+    if (attempt < 2) await sleep(1000) // don't sleep on last attempt
   }
   return new NetworkError({ url: '/api', reason: 'Failed after 3 attempts' })
 }
@@ -409,6 +438,7 @@ const result = await fetchWithRetry()
 #### Pattern 4: Accumulating results, some may fail
 
 **Before:**
+
 ```ts
 const results = []
 for (const id of ids) {
@@ -423,6 +453,7 @@ for (const id of ids) {
 ```
 
 **After:** Use `errore.partition` or filter
+
 ```ts
 import * as errore from 'errore'
 
@@ -430,7 +461,7 @@ const allResults = await Promise.all(ids.map(fetchItem))
 const [items, errors] = errore.partition(allResults)
 
 // Log errors if needed
-errors.forEach(e => console.warn('Failed:', e.message))
+errors.forEach((e) => console.warn('Failed:', e.message))
 
 // items contains only successful results
 ```
@@ -438,8 +469,9 @@ errors.forEach(e => console.warn('Failed:', e.message))
 #### Pattern 5: Transform or default
 
 **Before:**
+
 ```ts
-let value;
+let value
 try {
   const raw = await fetchValue()
   value = transform(raw)
@@ -449,6 +481,7 @@ try {
 ```
 
 **After:** Clean expression
+
 ```ts
 const raw = await fetchValue()
 const value = raw instanceof Error ? defaultValue : transform(raw)
@@ -457,8 +490,9 @@ const value = raw instanceof Error ? defaultValue : transform(raw)
 #### Pattern 6: Cache with fallback to fetch
 
 **Before:**
+
 ```ts
-let data;
+let data
 try {
   data = cache.get(key)
   if (!data) throw new Error('cache miss')
@@ -469,19 +503,23 @@ try {
 ```
 
 **After:** Explicit flow
+
 ```ts
 import * as errore from 'errore'
 
-const cached = cache.get(key)  // returns Data | null
+const cached = cache.get(key) // returns Data | null
 
-const data = cached ?? await (async () => {
-  const fetched = await fetchFromDb(key)
-  if (errore.isOk(fetched)) cache.set(key, fetched)
-  return fetched
-})()
+const data =
+  cached ??
+  (await (async () => {
+    const fetched = await fetchFromDb(key)
+    if (errore.isOk(fetched)) cache.set(key, fetched)
+    return fetched
+  })())
 ```
 
 Or simpler:
+
 ```ts
 import * as errore from 'errore'
 
@@ -499,8 +537,9 @@ async function getWithCache(key: string): Promise<DbError | Data> {
 #### Pattern 7: Multiple sources with fallback chain
 
 **Before:**
+
 ```ts
-let config;
+let config
 try {
   config = loadFromEnv()
 } catch {
@@ -513,18 +552,22 @@ try {
 ```
 
 **After:** Chain with `??` and `errore.isOk`
+
 ```ts
 import * as errore from 'errore'
 
-const envConfig = loadFromEnv()      // ConfigError | Config
-const fileConfig = loadFromFile()    // ConfigError | Config
+const envConfig = loadFromEnv() // ConfigError | Config
+const fileConfig = loadFromFile() // ConfigError | Config
 
-const config = errore.isOk(envConfig) ? envConfig
-  : errore.isOk(fileConfig) ? fileConfig
-  : defaultConfig
+const config = errore.isOk(envConfig)
+  ? envConfig
+  : errore.isOk(fileConfig)
+    ? fileConfig
+    : defaultConfig
 ```
 
 Or as a function:
+
 ```ts
 import * as errore from 'errore'
 
@@ -543,10 +586,12 @@ function loadConfig(): Config {
 #### Key Insight: Expressions over Statements
 
 The pattern is always:
+
 1. **Before:** `let x; try { x = ... } catch { x = ... }` (statements)
 2. **After:** `const x = result instanceof Error ? fallback : result` (expression)
 
 This makes code:
+
 - More readable (no mutation)
 - Type-safe (TypeScript tracks the union)
 - Easier to test (pure expressions)
@@ -589,7 +634,7 @@ import * as errore from 'errore'
 // Define errors with $variable interpolation
 class MyError extends errore.createTaggedError({
   name: 'MyError',
-  message: 'Operation failed: $reason'
+  message: 'Operation failed: $reason',
 }) {}
 
 // Return errors instead of throwing
@@ -606,8 +651,8 @@ if (result instanceof Error) return result
 // Handle at top level
 if (result instanceof Error) {
   const msg = errore.matchError(result, {
-    MyError: e => e.reason,
-    Error: e => `Unknown: ${e.message}`  // required fallback for plain Error
+    MyError: (e) => e.reason,
+    Error: (e) => `Unknown: ${e.message}`, // required fallback for plain Error
   })
   console.log(msg)
 }

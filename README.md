@@ -17,7 +17,7 @@ if (user instanceof DbError) {
   console.error('DB failed:', user.reason)
   return
 }
-console.log(user.username)  // user is User, fully narrowed
+console.log(user.username) // user is User, fully narrowed
 ```
 
 ## Install
@@ -50,17 +50,18 @@ import * as errore from 'errore'
 // Define typed errors with $variable interpolation
 class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
-  message: 'User $id not found'
+  message: 'User $id not found',
 }) {}
 
 class DbError extends errore.createTaggedError({
   name: 'DbError',
-  message: 'Database query failed: $reason'
+  message: 'Database query failed: $reason',
 }) {}
 
 // Function returns Error | Value (no wrapper!)
 async function getUser(id: string): Promise<NotFoundError | DbError | User> {
-  const result = await db.query(id)
+  const result = await db
+    .query(id)
     .catch((e) => new DbError({ reason: e.message, cause: e }))
 
   if (result instanceof Error) return result
@@ -74,9 +75,9 @@ const user = await getUser('123')
 
 if (user instanceof Error) {
   const message = errore.matchError(user, {
-    NotFoundError: e => `User ${e.id} not found`,
-    DbError: e => `Database error: ${e.reason}`,
-    Error: e => `Unexpected error: ${e.message}`
+    NotFoundError: (e) => `User ${e.id} not found`,
+    DbError: (e) => `Database error: ${e.reason}`,
+    Error: (e) => `Unexpected error: ${e.message}`,
   })
   console.log(message)
   return
@@ -106,25 +107,25 @@ class AppError extends Error {
 class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
   message: '$resource not found',
-  extends: AppError
+  extends: AppError,
 }) {}
 
 class ValidationError extends errore.createTaggedError({
   name: 'ValidationError',
   message: 'Invalid $field: $reason',
-  extends: AppError
+  extends: AppError,
 }) {}
 
 class UnauthorizedError extends errore.createTaggedError({
   name: 'UnauthorizedError',
 
-  extends: AppError
+  extends: AppError,
 }) {}
 
 // Service function
 async function updateUser(
   userId: string,
-  data: { email?: string }
+  data: { email?: string },
 ): Promise<NotFoundError | ValidationError | UnauthorizedError | User> {
   const session = await getSession()
   if (!session) {
@@ -137,7 +138,10 @@ async function updateUser(
   }
 
   if (data.email && !isValidEmail(data.email)) {
-    return new ValidationError({ field: 'email', reason: 'Invalid email format' })
+    return new ValidationError({
+      field: 'email',
+      reason: 'Invalid email format',
+    })
   }
 
   return db.users.update(userId, data)
@@ -168,21 +172,21 @@ import * as errore from 'errore'
 // Variables are extracted from the message and required in constructor
 class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
-  message: 'User $id not found in $database'
+  message: 'User $id not found in $database',
 }) {}
 
 const err = new NotFoundError({ id: '123', database: 'users' })
-err.message   // 'User 123 not found in users'
-err.id        // '123'
-err.database  // 'users'
-err._tag      // 'NotFoundError'
+err.message // 'User 123 not found in users'
+err.id // '123'
+err.database // 'users'
+err._tag // 'NotFoundError'
 
 // Error without variables
 class EmptyError extends errore.createTaggedError({
   name: 'EmptyError',
-  message: 'Something went wrong'
+  message: 'Something went wrong',
 }) {}
-new EmptyError()  // no args required
+new EmptyError() // no args required
 
 // Message omitted — caller provides it at construction time
 class GenericError extends errore.createTaggedError({
@@ -194,7 +198,7 @@ new GenericError({ message: 'caller decides the message' })
 // With cause for error chaining
 class WrapperError extends errore.createTaggedError({
   name: 'WrapperError',
-  message: 'Failed to process $item'
+  message: 'Failed to process $item',
 }) {}
 new WrapperError({ item: 'data', cause: originalError })
 
@@ -206,12 +210,12 @@ class AppError extends Error {
 class HttpError extends errore.createTaggedError({
   name: 'HttpError',
   message: 'HTTP $status error',
-  extends: AppError
+  extends: AppError,
 }) {}
 
 const err = new HttpError({ status: 404 })
-err.statusCode  // 500 (inherited from AppError)
-err instanceof AppError  // true
+err.statusCode // 500 (inherited from AppError)
+err instanceof AppError // true
 ```
 
 **Reserved variable names:** `$_tag`, `$name`, `$stack`, `$cause` cannot be used in message templates — they conflict with Error internals.
@@ -223,7 +227,7 @@ Wrap errors with additional context while **preserving the original error** via 
 ```ts
 // Wrap with context, preserve original in cause
 async function processUser(id: string): Promise<ServiceError | ProcessedUser> {
-  const user = await getUser(id)  // returns NotFoundError | User
+  const user = await getUser(id) // returns NotFoundError | User
 
   if (user instanceof Error) {
     return new ServiceError({ id, cause: user })
@@ -235,10 +239,10 @@ async function processUser(id: string): Promise<ServiceError | ProcessedUser> {
 // Access original error via cause
 const result = await processUser('123')
 if (result instanceof Error) {
-  console.log(result.message)  // "Failed to process user 123"
+  console.log(result.message) // "Failed to process user 123"
 
   if (result.cause instanceof NotFoundError) {
-    console.log(result.cause.id)  // access original error's properties
+    console.log(result.cause.id) // access original error's properties
   }
 }
 ```
@@ -250,12 +254,12 @@ import * as errore from 'errore'
 
 class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
-  message: 'User $id not found'
+  message: 'User $id not found',
 }) {}
 
 class ServiceError extends errore.createTaggedError({
   name: 'ServiceError',
-  message: 'Failed to process user $id'
+  message: 'Failed to process user $id',
 }) {}
 ```
 
@@ -279,12 +283,12 @@ import * as errore from 'errore'
 
 class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
-  message: 'User $id not found'
+  message: 'User $id not found',
 }) {}
 
 class ServiceError extends errore.createTaggedError({
   name: 'ServiceError',
-  message: 'Failed to process user $id'
+  message: 'Failed to process user $id',
 }) {}
 
 // Deep chain: ServiceError -> NotFoundError
@@ -293,11 +297,11 @@ const service = new ServiceError({ id: '123', cause: notFound })
 
 // Instance method on tagged errors
 const found = service.findCause(NotFoundError)
-found?.id  // '123' — type-safe access
+found?.id // '123' — type-safe access
 
 // Standalone function for any Error
 const found2 = errore.findCause(service, NotFoundError)
-found2?.id  // '123'
+found2?.id // '123'
 ```
 
 This solves the problem where `result.cause instanceof MyError` only checks one level deep. `findCause` walks the entire chain:
@@ -309,10 +313,10 @@ const b = new ServiceError({ id: '123', cause: c })
 const a = new NotFoundError({ id: '456', cause: b })
 
 // Manual check only finds B
-a.cause instanceof DbError  // false — only checks one level
+a.cause instanceof DbError // false — only checks one level
 
 // findCause walks the full chain
-a.findCause(DbError)  // finds C ✓
+a.findCause(DbError) // finds C ✓
 ```
 
 Returns `undefined` if no matching ancestor is found. Safe against circular `.cause` references.
@@ -326,24 +330,26 @@ import * as errore from 'errore'
 
 class AppError extends Error {
   statusCode = 500
-  toResponse() { return { error: this.message, code: this.statusCode } }
+  toResponse() {
+    return { error: this.message, code: this.statusCode }
+  }
 }
 
 class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
   message: 'Resource $id not found',
-  extends: AppError
+  extends: AppError,
 }) {
   statusCode = 404
 }
 
 const err = new NotFoundError({ id: '123' })
-err instanceof NotFoundError  // true
-err instanceof AppError       // true
-err instanceof Error          // true
+err instanceof NotFoundError // true
+err instanceof AppError // true
+err instanceof Error // true
 
-err.statusCode    // 404
-err.toResponse()  // { error: 'Resource 123 not found', code: 404 }
+err.statusCode // 404
+err.toResponse() // { error: 'Resource 123 not found', code: 404 }
 ```
 
 ### Type Guards
@@ -373,21 +379,23 @@ const parsed = errore.try(() => JSON.parse(input))
 // Sync - with custom error type
 const parsed = errore.try({
   try: () => JSON.parse(input),
-  catch: e => new ParseError({ reason: e.message, cause: e })
+  catch: (e) => new ParseError({ reason: e.message, cause: e }),
 })
 
 // Async — prefer .catch() for promises (no wrapper needed)
-const response = await fetch(url)
-  .catch((e) => new NetworkError({ url, cause: e }))
+const response = await fetch(url).catch(
+  (e) => new NetworkError({ url, cause: e }),
+)
 
 // Async — errore.tryAsync also works, but .catch() is preferred
 const response = await errore.tryAsync({
   try: () => fetch(url),
-  catch: e => new NetworkError({ url, cause: e })
+  catch: (e) => new NetworkError({ url, cause: e }),
 })
 ```
 
 > **Best practices for `try` / `tryAsync`:**
+>
 > - **For async code, prefer `.catch()`** — `promise.catch((e) => new MyError({ cause: e }))` is simpler and avoids the wrapper. `errore.tryAsync` still works but `.catch()` is the idiomatic choice.
 > - **Use `errore.try` for sync code** — there's no equivalent of `.catch()` for synchronous throwing calls, so `errore.try(() => JSON.parse(input))` is the right tool.
 > - **Use as low as possible in the call stack** — only at boundaries with uncontrolled dependencies (third-party libs, `JSON.parse`, `fetch`, file I/O). Your own functions should return errors as values, never throw.
@@ -402,16 +410,16 @@ const response = await errore.tryAsync({
 import * as errore from 'errore'
 
 // Transform value (if not error)
-const name = errore.map(user, u => u.name)
+const name = errore.map(user, (u) => u.name)
 
 // Transform error
-const appError = errore.mapError(dbError, e => new AppError({ cause: e }))
+const appError = errore.mapError(dbError, (e) => new AppError({ cause: e }))
 
 // Chain operations
-const posts = errore.andThen(user, u => fetchPosts(u.id))
+const posts = errore.andThen(user, (u) => fetchPosts(u.id))
 
 // Side effects
-const logged = errore.tap(user, u => console.log('Got user:', u.name))
+const logged = errore.tap(user, (u) => console.log('Got user:', u.name))
 ```
 
 ### Resource Cleanup (defer)
@@ -458,8 +466,8 @@ You can also register existing `Disposable` objects directly:
 
 ```ts
 await using cleanup = new errore.AsyncDisposableStack()
-cleanup.use(dbConnection)   // calls dbConnection[Symbol.dispose]() on exit
-cleanup.adopt(handle, (h) => h.close())  // custom cleanup for non-disposable values
+cleanup.use(dbConnection) // calls dbConnection[Symbol.dispose]() on exit
+cleanup.adopt(handle, (h) => h.close()) // custom cleanup for non-disposable values
 ```
 
 ### Extraction
@@ -478,8 +486,8 @@ const name = errore.unwrapOr(result, 'Anonymous')
 
 // Pattern match
 const message = errore.match(result, {
-  ok: user => `Hello, ${user.name}`,
-  err: error => `Failed: ${error.message}`
+  ok: (user) => `Hello, ${user.name}`,
+  err: (error) => `Failed: ${error.message}`,
 })
 
 // Split array into [successes, errors]
@@ -495,29 +503,33 @@ import * as errore from 'errore'
 
 class ValidationError extends errore.createTaggedError({
   name: 'ValidationError',
-  message: 'Invalid $field'
+  message: 'Invalid $field',
 }) {}
 
 class NetworkError extends errore.createTaggedError({
   name: 'NetworkError',
-  message: 'Failed to fetch $url'
+  message: 'Failed to fetch $url',
 }) {}
 
 // Exhaustive matching - Error handler is always required
 const message = errore.matchError(error, {
-  ValidationError: e => `Invalid ${e.field}`,
-  NetworkError: e => `Failed to fetch ${e.url}`,
-  Error: e => `Unexpected: ${e.message}`  // required fallback for plain Error
+  ValidationError: (e) => `Invalid ${e.field}`,
+  NetworkError: (e) => `Failed to fetch ${e.url}`,
+  Error: (e) => `Unexpected: ${e.message}`, // required fallback for plain Error
 })
-console.log(message)  // side effects outside callbacks
+console.log(message) // side effects outside callbacks
 
 // Partial matching with fallback
-const fallbackMsg = errore.matchErrorPartial(error, {
-  ValidationError: e => `Invalid ${e.field}`
-}, e => `Unknown error: ${e.message}`)
+const fallbackMsg = errore.matchErrorPartial(
+  error,
+  {
+    ValidationError: (e) => `Invalid ${e.field}`,
+  },
+  (e) => `Unknown error: ${e.message}`,
+)
 
 // Type guards
-ValidationError.is(value)  // specific class
+ValidationError.is(value) // specific class
 ```
 
 ## How Type Safety Works
@@ -536,6 +548,7 @@ function example(result: NetworkError | User): string {
 ```
 
 This works because:
+
 1. `Error` is a built-in class TypeScript understands
 2. Custom error classes extend `Error`
 3. After an `instanceof Error` check, TS excludes all Error subtypes
@@ -549,7 +562,7 @@ import * as errore from 'errore'
 
 class NotFoundError extends errore.createTaggedError({
   name: 'NotFoundError',
-  message: 'Resource $id not found'
+  message: 'Resource $id not found',
 }) {}
 
 // Result + Option in one natural type
@@ -563,7 +576,7 @@ const user = findUser('123')
 
 // Handle error first
 if (user instanceof Error) {
-  return user.message  // TypeScript: user is NotFoundError
+  return user.message // TypeScript: user is NotFoundError
 }
 
 // Handle null/missing case - use ?. and ?? naturally!
@@ -580,13 +593,14 @@ console.log(user.name)
 
 ### Why this is better than Rust/Zig
 
-| Language | Result + Option | Order matters? |
-|----------|-----------------|----------------|
-| Rust | `Result<Option<T>, E>` or `Option<Result<T, E>>` | Yes, must unwrap in order |
-| Zig | `!?T` (error union + optional) | Yes, specific syntax |
-| **errore** | `Error \| T \| null` | **No!** Check in any order |
+| Language   | Result + Option                                  | Order matters?             |
+| ---------- | ------------------------------------------------ | -------------------------- |
+| Rust       | `Result<Option<T>, E>` or `Option<Result<T, E>>` | Yes, must unwrap in order  |
+| Zig        | `!?T` (error union + optional)                   | Yes, specific syntax       |
+| **errore** | `Error \| T \| null`                             | **No!** Check in any order |
 
 With errore you **check in any order**:
+
 - Use `?.` and `??` naturally
 - Check `instanceof Error` or `=== null` in any order
 - No unwrapping ceremony
@@ -607,9 +621,9 @@ The compiler can't save you here. You can ignore `err` entirely and use `user` d
 With errore, **forgetting to check is impossible**:
 
 ```ts
-const user = await fetchUser(id)  // type: NotFoundError | User
+const user = await fetchUser(id) // type: NotFoundError | User
 
-console.log(user.id)  // TS Error: Property 'id' does not exist on type 'NotFoundError'
+console.log(user.id) // TS Error: Property 'id' does not exist on type 'NotFoundError'
 ```
 
 Since errore uses a **single union variable** instead of two separate values, TypeScript forces you to narrow the type before accessing value-specific properties. You literally cannot use the value without first doing an `instanceof Error` check.
@@ -622,12 +636,13 @@ There's still one case errore can't catch: **ignored return values**:
 
 ```ts
 // Oops! Completely ignoring the return value
-updateUser(id, data)  // No error, but we should check!
+updateUser(id, data) // No error, but we should check!
 ```
 
 For this, use **TypeScript's built-in checks** or a linter:
 
 **TypeScript `tsconfig.json`:**
+
 ```json
 {
   "compilerOptions": {
@@ -641,6 +656,7 @@ This catches unused variables, though not ignored return values directly.
 **oxlint `no-unused-expressions`:**
 
 `oxlint.json`:
+
 ```json
 {
   "rules": {
@@ -650,6 +666,7 @@ This catches unused variables, though not ignored return values directly.
 ```
 
 Or via CLI:
+
 ```bash
 oxlint --deny no-unused-expressions
 ```
@@ -660,14 +677,14 @@ Combined with errore's type safety, these tools give you near-complete protectio
 
 **Direct returns** vs wrapper methods:
 
-| Result Pattern | errore |
-|---------------|--------|
-| `Result.ok(value)` | just `return value` |
-| `Result.err(error)` | just `return error` |
-| `result.value` | direct access after guard |
-| `result.map(fn)` | `map(result, fn)` |
-| `Result<User, Error>` | `Error \| User` |
-| `Result<Option<T>, E>` | `Error \| T \| null` |
+| Result Pattern         | errore                    |
+| ---------------------- | ------------------------- |
+| `Result.ok(value)`     | just `return value`       |
+| `Result.err(error)`    | just `return error`       |
+| `result.value`         | direct access after guard |
+| `result.map(fn)`       | `map(result, fn)`         |
+| `Result<User, Error>`  | `Error \| User`           |
+| `Result<Option<T>, E>` | `Error \| T \| null`      |
 
 ## Vs neverthrow / better-result
 
@@ -680,15 +697,15 @@ import { ok, err, Result } from 'neverthrow'
 function getUser(id: string): Result<User, NotFoundError> {
   const user = db.find(id)
   if (!user) return err(new NotFoundError({ id }))
-  return ok(user)  // must wrap
+  return ok(user) // must wrap
 }
 
 const result = getUser('123')
 if (result.isErr()) {
-  console.log(result.error)  // must unwrap
+  console.log(result.error) // must unwrap
   return
 }
-console.log(result.value.name)  // must unwrap
+console.log(result.value.name) // must unwrap
 ```
 
 ```ts
@@ -696,27 +713,27 @@ console.log(result.value.name)  // must unwrap
 function getUser(id: string): User | NotFoundError {
   const user = db.find(id)
   if (!user) return new NotFoundError({ id })
-  return user  // just return
+  return user // just return
 }
 
 const user = getUser('123')
 if (user instanceof Error) {
-  console.log(user)  // it's already the error
+  console.log(user) // it's already the error
   return
 }
-console.log(user.name)  // it's already the user
+console.log(user.name) // it's already the user
 ```
 
 **The key insight**: `T | Error` already encodes success/failure. TypeScript's type narrowing does the rest. No wrapper needed.
 
-| Feature | neverthrow | errore |
-|---------|------------|--------|
-| Type-safe errors | ✓ | ✓ |
-| Exhaustive handling | ✓ | ✓ |
-| Works with null | `Result<T \| null, E>` | `T \| E \| null` |
-| Learning curve | New API (`ok`, `err`, `map`, `andThen`, ...) | Just `instanceof` |
-| Bundle size | ~3KB min | **~0 bytes** |
-| Interop | Requires wrapping/unwrapping at boundaries | Native TypeScript |
+| Feature             | neverthrow                                   | errore            |
+| ------------------- | -------------------------------------------- | ----------------- |
+| Type-safe errors    | ✓                                            | ✓                 |
+| Exhaustive handling | ✓                                            | ✓                 |
+| Works with null     | `Result<T \| null, E>`                       | `T \| E \| null`  |
+| Learning curve      | New API (`ok`, `err`, `map`, `andThen`, ...) | Just `instanceof` |
+| Bundle size         | ~3KB min                                     | **~0 bytes**      |
+| Interop             | Requires wrapping/unwrapping at boundaries   | Native TypeScript |
 
 neverthrow also requires an [eslint plugin](https://github.com/mdbetancourt/eslint-plugin-neverthrow) to catch unhandled results. With errore, TypeScript itself prevents you from using a value without checking the error first.
 
@@ -730,9 +747,9 @@ import { Effect, pipe } from 'effect'
 
 const program = pipe(
   fetchUser(id),
-  Effect.flatMap(user => fetchPosts(user.id)),
-  Effect.map(posts => posts.filter(p => p.published)),
-  Effect.catchTag('NotFoundError', () => Effect.succeed([]))
+  Effect.flatMap((user) => fetchPosts(user.id)),
+  Effect.map((posts) => posts.filter((p) => p.published)),
+  Effect.catchTag('NotFoundError', () => Effect.succeed([])),
 )
 
 const result = await Effect.runPromise(program)
@@ -746,19 +763,19 @@ if (user instanceof Error) return []
 const posts = await fetchPosts(user.id)
 if (posts instanceof Error) return []
 
-return posts.filter(p => p.published)
+return posts.filter((p) => p.published)
 ```
 
 Effect is powerful if you need its full feature set. But if you just want type-safe errors:
 
-| | Effect | errore |
-|-|--------|--------|
-| Learning curve | Steep (new paradigm) | Minimal (just `instanceof`) |
-| Codebase impact | Pervasive (everything becomes an Effect) | Surgical (adopt incrementally) |
-| Bundle size | ~50KB+ | **~0 bytes** |
+|                  | Effect                                      | errore                              |
+| ---------------- | ------------------------------------------- | ----------------------------------- |
+| Learning curve   | Steep (new paradigm)                        | Minimal (just `instanceof`)         |
+| Codebase impact  | Pervasive (everything becomes an Effect)    | Surgical (adopt incrementally)      |
+| Bundle size      | ~50KB+                                      | **~0 bytes**                        |
 | Resource cleanup | `Scope` + `addFinalizer` + `acquireRelease` | `using` + `DisposableStack.defer()` |
-| Cancellation | Fiber interruption model | Native `AbortController` |
-| Use case | Full FP framework | Just error handling |
+| Cancellation     | Fiber interruption model                    | Native `AbortController`            |
+| Use case         | Full FP framework                           | Just error handling                 |
 
 **Use Effect** when you want dependency injection, structured concurrency, and the full functional programming experience.
 

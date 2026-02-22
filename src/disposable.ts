@@ -173,7 +173,9 @@ export class AsyncDisposableStack implements AsyncDisposable {
   use<T extends AsyncDisposable | Disposable | null | undefined>(value: T): T {
     if (value != null) {
       if (Symbol.asyncDispose in (value as object)) {
-        this.defer(async () => await (value as AsyncDisposable)[Symbol.asyncDispose]())
+        this.defer(
+          async () => await (value as AsyncDisposable)[Symbol.asyncDispose](),
+        )
       } else {
         this.defer(() => (value as Disposable)[Symbol.dispose]())
       }
@@ -238,14 +240,20 @@ export class AsyncDisposableStack implements AsyncDisposable {
  * Build a SuppressedError if the global exists (newer runtimes),
  * otherwise fall back to cause chain.
  */
-function buildSuppressedError(latestError: unknown, previousError: unknown): Error {
+function buildSuppressedError(
+  latestError: unknown,
+  previousError: unknown,
+): Error {
   if (typeof globalThis.SuppressedError === 'function') {
-    return new globalThis.SuppressedError(latestError, previousError, 'An error was suppressed during disposal')
+    return new globalThis.SuppressedError(
+      latestError,
+      previousError,
+      'An error was suppressed during disposal',
+    )
   }
   // Fallback: attach previous error as cause
-  const err = latestError instanceof Error
-    ? latestError
-    : new Error(String(latestError))
+  const err =
+    latestError instanceof Error ? latestError : new Error(String(latestError))
   if (!err.cause) {
     err.cause = previousError
   }

@@ -10,7 +10,9 @@
  */
 export function unwrap<V>(value: V, message?: string): Exclude<V, Error> {
   if (value instanceof Error) {
-    throw new Error(message ?? `Unwrap called on error: ${value.message}`, { cause: value })
+    throw new Error(message ?? `Unwrap called on error: ${value.message}`, {
+      cause: value,
+    })
   }
   return value as Exclude<V, Error>
 }
@@ -60,7 +62,9 @@ export function match<V, R>(
  * const results = await Promise.all(ids.map(fetchUser))
  * const [users, errors] = partition(results)
  */
-export function partition<V>(values: V[]): [Exclude<V, Error>[], Extract<V, Error>[]] {
+export function partition<V>(
+  values: V[],
+): [Exclude<V, Error>[], Extract<V, Error>[]] {
   const oks: Exclude<V, Error>[] = []
   const errs: Extract<V, Error>[] = []
   for (const v of values) {

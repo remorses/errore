@@ -22,10 +22,58 @@ import { serializeCause } from './serialize-cause.js'
 
 // Valid identifier characters for variable names (a-z, A-Z, 0-9, _)
 type Alpha =
-  | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm'
-  | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
-  | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M'
-  | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
+  | 'a'
+  | 'b'
+  | 'c'
+  | 'd'
+  | 'e'
+  | 'f'
+  | 'g'
+  | 'h'
+  | 'i'
+  | 'j'
+  | 'k'
+  | 'l'
+  | 'm'
+  | 'n'
+  | 'o'
+  | 'p'
+  | 'q'
+  | 'r'
+  | 's'
+  | 't'
+  | 'u'
+  | 'v'
+  | 'w'
+  | 'x'
+  | 'y'
+  | 'z'
+  | 'A'
+  | 'B'
+  | 'C'
+  | 'D'
+  | 'E'
+  | 'F'
+  | 'G'
+  | 'H'
+  | 'I'
+  | 'J'
+  | 'K'
+  | 'L'
+  | 'M'
+  | 'N'
+  | 'O'
+  | 'P'
+  | 'Q'
+  | 'R'
+  | 'S'
+  | 'T'
+  | 'U'
+  | 'V'
+  | 'W'
+  | 'X'
+  | 'Y'
+  | 'Z'
   | '_'
 type Digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
 type AlphaNum = Alpha | Digit
@@ -34,35 +82,40 @@ type AlphaNum = Alpha | Digit
  * Recursively consume valid identifier characters to extract a variable name.
  * Returns [extractedVar, remainingString] as a tuple encoded in an object.
  */
-type ConsumeVar<S extends string, Acc extends string = ''> =
-  S extends `${infer C}${infer Rest}`
-    ? C extends AlphaNum
-      ? ConsumeVar<Rest, `${Acc}${C}`>
-      : { var: Acc; rest: S }
-    : { var: Acc; rest: '' }
+type ConsumeVar<
+  S extends string,
+  Acc extends string = '',
+> = S extends `${infer C}${infer Rest}`
+  ? C extends AlphaNum
+    ? ConsumeVar<Rest, `${Acc}${C}`>
+    : { var: Acc; rest: S }
+  : { var: Acc; rest: '' }
 
 /**
  * Extract variable names from a message template containing $variable placeholders.
  * Only extracts valid identifiers (alphanumeric + underscore).
  */
-type ExtractVars<S extends string> =
-  S extends `${string}$${infer AfterDollar}`
-    ? AfterDollar extends `${Alpha}${string}`
-      ? ConsumeVar<AfterDollar> extends { var: infer V extends string; rest: infer R extends string }
-        ? V extends ''
-          ? ExtractVars<R>
-          : V | ExtractVars<R>
-        : never
-      : ExtractVars<AfterDollar>
-    : never
+type ExtractVars<S extends string> = S extends `${string}$${infer AfterDollar}`
+  ? AfterDollar extends `${Alpha}${string}`
+    ? ConsumeVar<AfterDollar> extends {
+        var: infer V extends string
+        rest: infer R extends string
+      }
+      ? V extends ''
+        ? ExtractVars<R>
+        : V | ExtractVars<R>
+      : never
+    : ExtractVars<AfterDollar>
+  : never
 
 /**
  * Build props type from extracted variable names.
  * Each variable becomes a required property accepting string or number.
  */
-type VarProps<Msg extends string> = ExtractVars<Msg> extends never
-  ? {}
-  : { [K in ExtractVars<Msg>]: string | number }
+type VarProps<Msg extends string> =
+  ExtractVars<Msg> extends never
+    ? {}
+    : { [K in ExtractVars<Msg>]: string | number }
 
 /**
  * Props with optional cause for error chaining.
@@ -90,7 +143,9 @@ export type FactoryTaggedErrorInstance<
   readonly fingerprint: readonly [Tag, Msg]
   toJSON(): object
   /** Walk the .cause chain to find an ancestor matching a specific error class. */
-  findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined
+  findCause<T extends Error>(
+    ErrorClass: new (...args: any[]) => T,
+  ): T | undefined
 } & Readonly<VarProps<Msg>>
 
 /**
@@ -102,7 +157,9 @@ export type FactoryTaggedErrorClass<
   Base extends Error = Error,
 > = {
   new (
-    ...args: ExtractVars<Msg> extends never ? [args?: { cause?: unknown }] : [args: PropsWithCause<Msg>]
+    ...args: ExtractVars<Msg> extends never
+      ? [args?: { cause?: unknown }]
+      : [args: PropsWithCause<Msg>]
   ): FactoryTaggedErrorInstance<Tag, Msg, Base>
   /** Type guard for this error class */
   is(value: unknown): value is FactoryTaggedErrorInstance<Tag, Msg, Base>
@@ -116,7 +173,9 @@ export type FactoryTaggedErrorClass<
  * This parses the template once when creating the error class, then each
  * constructor call uses a simple loop over pre-parsed segments.
  */
-const compileMessageInterpolator = (template: string): {
+const compileMessageInterpolator = (
+  template: string,
+): {
   readonly variableNames: string[]
   readonly interpolate: (values?: Record<string, unknown>) => string
 } => {
@@ -273,7 +332,8 @@ export function createTaggedError<
   const { name: tag } = opts
   const messageTemplate = (opts.message ?? '$message') as Msg
   const BaseError = opts.extends ?? Error
-  const { variableNames: varNames, interpolate } = compileMessageInterpolator(messageTemplate)
+  const { variableNames: varNames, interpolate } =
+    compileMessageInterpolator(messageTemplate)
 
   // These variable names conflict with Error internals and would be confusing
   // if used as template variables (the interpolated value can't be read back
@@ -282,8 +342,8 @@ export function createTaggedError<
   for (const forbidden of FORBIDDEN_VARS) {
     if (varNames.includes(forbidden)) {
       throw new Error(
-        `createTaggedError(${tag}): template variable $${forbidden} is reserved and not allowed. `
-          + `Use a different variable name.`,
+        `createTaggedError(${tag}): template variable $${forbidden} is reserved and not allowed. ` +
+          `Use a different variable name.`,
       )
     }
   }
@@ -292,8 +352,18 @@ export function createTaggedError<
   const TypedBase = BaseError as typeof Error
 
   // Keys that are managed internally and must not be overwritten by template variables
-  const RESERVED_KEYS = new Set(['_tag', 'messageTemplate', 'fingerprint', 'name', 'stack', 'message', 'cause'])
-  const serializableVarNames = varNames.filter((varName) => !RESERVED_KEYS.has(varName))
+  const RESERVED_KEYS = new Set([
+    '_tag',
+    'messageTemplate',
+    'fingerprint',
+    'name',
+    'stack',
+    'message',
+    'cause',
+  ])
+  const serializableVarNames = varNames.filter(
+    (varName) => !RESERVED_KEYS.has(varName),
+  )
 
   class Tagged extends TypedBase {
     readonly _tag: Name = tag
@@ -333,7 +403,9 @@ export function createTaggedError<
       }
     }
 
-    findCause<T extends Error>(ErrorClass: new (...args: any[]) => T): T | undefined {
+    findCause<T extends Error>(
+      ErrorClass: new (...args: any[]) => T,
+    ): T | undefined {
       return findCause(this, ErrorClass)
     }
 
@@ -357,5 +429,9 @@ export function createTaggedError<
     }
   }
 
-  return Tagged as unknown as FactoryTaggedErrorClass<Name, Msg, InstanceType<BaseClass>>
+  return Tagged as unknown as FactoryTaggedErrorClass<
+    Name,
+    Msg,
+    InstanceType<BaseClass>
+  >
 }

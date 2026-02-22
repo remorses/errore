@@ -281,7 +281,8 @@ const styles = css`
     }
   }
 
-  ul, ol {
+  ul,
+  ol {
     padding: 0;
     margin: 0 0 1.5rem 1.5rem;
   }
@@ -687,10 +688,6 @@ const codeSkillInstall = `npx skills add remorses/errore`
 const codeAgentsMd = `This codebase uses the errore.org convention.
 ALWAYS read the errore skill before editing any code.`
 
-
-
-
-
 function Page() {
   return html`
     <!DOCTYPE html>
@@ -699,167 +696,386 @@ function Page() {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Errore - Errors as Values in TypeScript</title>
-        <meta name="description" content="Go-style error handling for TypeScript. Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks." />
-        <meta property="og:title" content="Errore - Go-style Error Handling for TypeScript" />
-        <meta property="og:description" content="Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks. Type-safe, zero runtime overhead." />
+        <meta
+          name="description"
+          content="Go-style error handling for TypeScript. Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks."
+        />
+        <meta
+          property="og:title"
+          content="Errore - Go-style Error Handling for TypeScript"
+        />
+        <meta
+          property="og:description"
+          content="Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks. Type-safe, zero runtime overhead."
+        />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://errore.org" />
         <meta property="og:image" content="https://errore.org/og-image.jpg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Errore - Go-style Error Handling for TypeScript" />
-        <meta name="twitter:description" content="Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks. Type-safe, zero runtime overhead." />
+        <meta
+          name="twitter:title"
+          content="Errore - Go-style Error Handling for TypeScript"
+        />
+        <meta
+          name="twitter:description"
+          content="Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks. Type-safe, zero runtime overhead."
+        />
         <meta name="twitter:image" content="https://errore.org/og-image.jpg" />
-        <meta name="twitter:image:alt" content="Errore - Type-safe errors as values for TypeScript" />
+        <meta
+          name="twitter:image:alt"
+          content="Errore - Type-safe errors as values for TypeScript"
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,500&family=Lato:wght@400;700;900&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet" />
-        <style>${raw(styles)}</style>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,500&family=Lato:wght@400;700;900&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css"
+          rel="stylesheet"
+        />
+        <style>
+          ${raw(styles)}
+        </style>
       </head>
       <body>
         <main>
           <span class="tag">Manifesto</span>
           <h1>Errors as Values in TypeScript</h1>
-          <p class="subtitle">Go-style error handling for TypeScript. Unions instead of tuples. <code>instanceof</code> instead of nil checks.</p>
+          <p class="subtitle">
+            Go-style error handling for TypeScript. Unions instead of tuples.
+            <code>instanceof</code> instead of nil checks.
+          </p>
 
-          <p><span class="intro-letter">I</span>n Go, functions return errors as values instead of throwing exceptions. errore brings the same convention to TypeScript—but instead of Go's two-value tuple (<code>val, err</code>), you return a single <code>Error | T</code> union. Instead of checking <code>err != nil</code>, you check <code>instanceof Error</code>. TypeScript narrows the type automatically. Forget to check and your code won't compile.</p>
+          <p>
+            <span class="intro-letter">I</span>n Go, functions return errors as
+            values instead of throwing exceptions. errore brings the same
+            convention to TypeScript—but instead of Go's two-value tuple (<code
+              >val, err</code
+            >), you return a single <code>Error | T</code> union. Instead of
+            checking <code>err != nil</code>, you check
+            <code>instanceof Error</code>. TypeScript narrows the type
+            automatically. Forget to check and your code won't compile.
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeHook}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeHook}</code></pre>
 
-          <p>Functions return errors in their type signature. Callers check with <code>instanceof Error</code>. TypeScript narrows the type automatically. That's it.</p>
+          <p>
+            Functions return errors in their type signature. Callers check with
+            <code>instanceof Error</code>. TypeScript narrows the type
+            automatically. That's it.
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeWhyItWorks}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeWhyItWorks}</code></pre>
 
-          <p><strong>If you forget to handle the error, your code won't compile:</strong></p>
+          <p>
+            <strong
+              >If you forget to handle the error, your code won't
+              compile:</strong
+            >
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeCompileError}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeCompileError}</code></pre>
 
           <p>This gives you:</p>
 
           <ol>
-            <li><strong>Compile-time safety.</strong> Unhandled errors are caught by TypeScript, not by your users in production.</li>
-            <li><strong>Self-documenting signatures.</strong> The return type shows exactly what can go wrong. No need to read the implementation or hope for documentation.</li>
-            <li><strong>Error handling as expressions.</strong> No more <code>let x; try { x = fn() } catch...</code>. Fewer variables, less nesting, errors handled where they occur.</li>
-            <li><strong>Trackable error flow.</strong> Create custom error classes. Trace them through your codebase. Like Effect, but without the learning curve.</li>
+            <li>
+              <strong>Compile-time safety.</strong> Unhandled errors are caught
+              by TypeScript, not by your users in production.
+            </li>
+            <li>
+              <strong>Self-documenting signatures.</strong> The return type
+              shows exactly what can go wrong. No need to read the
+              implementation or hope for documentation.
+            </li>
+            <li>
+              <strong>Error handling as expressions.</strong> No more
+              <code>let x; try { x = fn() } catch...</code>. Fewer variables,
+              less nesting, errors handled where they occur.
+            </li>
+            <li>
+              <strong>Trackable error flow.</strong> Create custom error
+              classes. Trace them through your codebase. Like Effect, but
+              without the learning curve.
+            </li>
           </ol>
 
-          <p><strong>Expressions instead of blocks.</strong> Error handling stays linear:</p>
+          <p>
+            <strong>Expressions instead of blocks.</strong> Error handling stays
+            linear:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeExpressionVsBlock}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeExpressionVsBlock}</code></pre>
 
           <h2>AI Agents</h2>
 
-          <p>errore is perfect for AI coding agents. When an agent writes code with try-catch, errors are invisible—the agent can forget a catch block, swallow an exception, or miss an error path entirely. With errore, <strong>the compiler won't let it</strong>. Every error is in the return type. The agent must handle it with <code>instanceof</code> before it can access the value. Unhandled errors are compile errors, not runtime surprises discovered in production.</p>
+          <p>
+            errore is perfect for AI coding agents. When an agent writes code
+            with try-catch, errors are invisible—the agent can forget a catch
+            block, swallow an exception, or miss an error path entirely. With
+            errore, <strong>the compiler won't let it</strong>. Every error is
+            in the return type. The agent must handle it with
+            <code>instanceof</code> before it can access the value. Unhandled
+            errors are compile errors, not runtime surprises discovered in
+            production.
+          </p>
 
           <p>Install the skill file:</p>
 
-          <pre class="language-bash"><code class="language-bash">${codeSkillInstall}</code></pre>
+          <pre
+            class="language-bash"
+          ><code class="language-bash">${codeSkillInstall}</code></pre>
 
           <p>Then add this to your <code>AGENTS.md</code>:</p>
 
-          <pre class="language-markdown"><code class="language-markdown">${codeAgentsMd}</code></pre>
+          <pre
+            class="language-markdown"
+          ><code class="language-markdown">${codeAgentsMd}</code></pre>
 
-          <p><strong>Better than Go.</strong> This is Go-style error handling—errors as values, not exceptions. But with one key difference: Go's two return values let you ignore the error and use the value anyway. A single union makes that impossible:</p>
+          <p>
+            <strong>Better than Go.</strong> This is Go-style error
+            handling—errors as values, not exceptions. But with one key
+            difference: Go's two return values let you ignore the error and use
+            the value anyway. A single union makes that impossible:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeGoComparison}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeGoComparison}</code></pre>
 
-          <p><strong>Errors and nulls together.</strong> Use <code>?.</code> and <code>??</code> naturally:</p>
+          <p>
+            <strong>Errors and nulls together.</strong> Use <code>?.</code> and
+            <code>??</code> naturally:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeNullHandling}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeNullHandling}</code></pre>
 
           <h2>Tagged Errors</h2>
 
-          <p>For more structure, create typed errors with <code>$variable</code> interpolation:</p>
+          <p>
+            For more structure, create typed errors with
+            <code>$variable</code> interpolation:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeTaggedErrors}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeTaggedErrors}</code></pre>
 
-          <p><strong>Pattern match with <code>matchError</code>.</strong> It's exhaustive—the compiler errors if you forget to handle a case:</p>
+          <p>
+            <strong>Pattern match with <code>matchError</code>.</strong> It's
+            exhaustive—the compiler errors if you forget to handle a case:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codePatternMatch}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codePatternMatch}</code></pre>
 
-          <p><strong>Same with <code>instanceof</code>.</strong> TypeScript tracks which errors you've handled. Forget one, and it won't compile:</p>
+          <p>
+            <strong>Same with <code>instanceof</code>.</strong> TypeScript
+            tracks which errors you've handled. Forget one, and it won't
+            compile:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeInstanceofExhaustive}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeInstanceofExhaustive}</code></pre>
 
-          <p>This guarantees every error flow is handled. No silent failures. No forgotten edge cases.</p>
+          <p>
+            This guarantees every error flow is handled. No silent failures. No
+            forgotten edge cases.
+          </p>
 
           <h2>Migration</h2>
 
           <p><strong>try-catch with multiple error types:</strong></p>
-          <pre class="language-typescript"><code class="language-typescript">${codeMigrationBefore}</code></pre>
-          <pre class="language-typescript"><code class="language-typescript">${codeMigrationAfter}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationBefore}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationAfter}</code></pre>
 
           <p><strong>Parallel operations with Promise.all:</strong></p>
-          <pre class="language-typescript"><code class="language-typescript">${codeMigrationParallelBefore}</code></pre>
-          <pre class="language-typescript"><code class="language-typescript">${codeMigrationParallelAfter}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationParallelBefore}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationParallelAfter}</code></pre>
 
           <p><strong>Wrapping libraries that throw:</strong></p>
-          <pre class="language-typescript"><code class="language-typescript">${codeMigrationWrapBefore}</code></pre>
-          <pre class="language-typescript"><code class="language-typescript">${codeMigrationWrapAfter}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationWrapBefore}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationWrapAfter}</code></pre>
 
           <p><strong>Validation:</strong></p>
-          <pre class="language-typescript"><code class="language-typescript">${codeMigrationValidateBefore}</code></pre>
-          <pre class="language-typescript"><code class="language-typescript">${codeMigrationValidateAfter}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationValidateBefore}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationValidateAfter}</code></pre>
 
           <h2>Resource Cleanup</h2>
 
-          <p>errore ships <code>DisposableStack</code> polyfills for Go-like <code>defer</code> cleanup. Use with TypeScript's <code>using</code> keyword — cleanup runs automatically when the scope exits, in reverse order:</p>
+          <p>
+            errore ships <code>DisposableStack</code> polyfills for Go-like
+            <code>defer</code> cleanup. Use with TypeScript's
+            <code>using</code> keyword — cleanup runs automatically when the
+            scope exits, in reverse order:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeDeferBefore}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeDeferBefore}</code></pre>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeDeferAfter}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeDeferAfter}</code></pre>
 
-          <p><code>await using</code> guarantees cleanup on every exit path — normal return, early error return, or exception. No <code>try/finally</code> nesting. Adding more resources is just another <code>cleanup.defer()</code>.</p>
+          <p>
+            <code>await using</code> guarantees cleanup on every exit path —
+            normal return, early error return, or exception. No
+            <code>try/finally</code> nesting. Adding more resources is just
+            another <code>cleanup.defer()</code>.
+          </p>
 
           <h2>Vs neverthrow / better-result</h2>
 
-          <p>These libraries wrap values in a <code>Result&lt;T, E&gt;</code> container. You construct with <code>ok()</code> and <code>err()</code>, then unwrap with <code>.value</code> and <code>.error</code>:</p>
+          <p>
+            These libraries wrap values in a
+            <code>Result&lt;T, E&gt;</code> container. You construct with
+            <code>ok()</code> and <code>err()</code>, then unwrap with
+            <code>.value</code> and <code>.error</code>:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeNeverthrow}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeNeverthrow}</code></pre>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeNeverthrowErrore}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeNeverthrowErrore}</code></pre>
 
-          <p><strong>The key insight:</strong> <code>T | Error</code> already encodes success/failure. TypeScript's type narrowing does the rest. No wrapper needed.</p>
+          <p>
+            <strong>The key insight:</strong> <code>T | Error</code> already
+            encodes success/failure. TypeScript's type narrowing does the rest.
+            No wrapper needed.
+          </p>
 
-          <p>neverthrow requires an <a href="https://github.com/mdbetancourt/eslint-plugin-neverthrow">eslint plugin</a> to catch unhandled results. With errore, TypeScript itself prevents using a value without checking the error first.</p>
+          <p>
+            neverthrow requires an
+            <a href="https://github.com/mdbetancourt/eslint-plugin-neverthrow"
+              >eslint plugin</a
+            >
+            to catch unhandled results. With errore, TypeScript itself prevents
+            using a value without checking the error first.
+          </p>
 
           <h2>Vs Effect.ts</h2>
 
-          <p>Effect is not just error handling—it's a complete functional programming framework with dependency injection, concurrency, resource management, and more:</p>
+          <p>
+            Effect is not just error handling—it's a complete functional
+            programming framework with dependency injection, concurrency,
+            resource management, and more:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeEffect}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeEffect}</code></pre>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeEffectErrore}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeEffectErrore}</code></pre>
 
-          <p><strong>Use Effect</strong> when you want DI, structured concurrency, and the full FP experience. <strong>Use errore</strong> when you just want type-safe errors without rewriting your codebase. For resource cleanup, Effect uses <code>Scope</code> + <code>acquireRelease</code> + <code>addFinalizer</code>. errore uses native <code>using</code> + <code>DisposableStack.defer()</code> — same guarantee, zero framework.</p>
+          <p>
+            <strong>Use Effect</strong> when you want DI, structured
+            concurrency, and the full FP experience.
+            <strong>Use errore</strong> when you just want type-safe errors
+            without rewriting your codebase. For resource cleanup, Effect uses
+            <code>Scope</code> + <code>acquireRelease</code> +
+            <code>addFinalizer</code>. errore uses native <code>using</code> +
+            <code>DisposableStack.defer()</code> — same guarantee, zero
+            framework.
+          </p>
 
-          <p><a href="/errore-vs-effect">See the full side-by-side comparison →</a></p>
+          <p>
+            <a href="/errore-vs-effect"
+              >See the full side-by-side comparison →</a
+            >
+          </p>
 
           <h2>Zero-Dependency Philosophy</h2>
 
-          <p>errore is more a <strong>way of writing code</strong> than a library. The core pattern requires nothing:</p>
+          <p>
+            errore is more a <strong>way of writing code</strong> than a
+            library. The core pattern requires nothing:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeZeroDep}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeZeroDep}</code></pre>
 
-          <p>The <code>errore</code> package provides conveniences: <code>createTaggedError</code> for less boilerplate, <code>matchError</code> for exhaustive matching, <code>tryAsync</code> for catching exceptions. But the pattern—<strong>errors as union types</strong>—works with zero dependencies.</p>
+          <p>
+            The <code>errore</code> package provides conveniences:
+            <code>createTaggedError</code> for less boilerplate,
+            <code>matchError</code> for exhaustive matching,
+            <code>tryAsync</code> for catching exceptions. But the
+            pattern—<strong>errors as union types</strong>—works with zero
+            dependencies.
+          </p>
 
           <h3>Perfect for Libraries</h3>
 
-          <p>This approach is ideal for library authors. Instead of forcing users to adopt your error handling framework:</p>
+          <p>
+            This approach is ideal for library authors. Instead of forcing users
+            to adopt your error handling framework:
+          </p>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeLibraryBad}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeLibraryBad}</code></pre>
 
-          <pre class="language-typescript"><code class="language-typescript">${codeLibraryGood}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeLibraryGood}</code></pre>
 
-          <p>Your library stays lightweight. Users get type-safe errors without adopting an opinionated wrapper.</p>
+          <p>
+            Your library stays lightweight. Users get type-safe errors without
+            adopting an opinionated wrapper.
+          </p>
         </main>
 
         <footer>
-          <pre class="language-bash"><code class="language-bash">npm install errore</code></pre>
-          <p><a href="https://github.com/remorses/errore">GitHub</a> · <a href="/errore-vs-effect">errore vs Effect</a> · Made by <a href="https://github.com/remorses">remorses</a></p>
+          <pre
+            class="language-bash"
+          ><code class="language-bash">npm install errore</code></pre>
+          <p>
+            <a href="https://github.com/remorses/errore">GitHub</a> ·
+            <a href="/errore-vs-effect">errore vs Effect</a> · Made by
+            <a href="https://github.com/remorses">remorses</a>
+          </p>
         </footer>
 
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>

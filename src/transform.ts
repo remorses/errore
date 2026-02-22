@@ -7,7 +7,10 @@
  * // If user is User, result is string
  * // If user is NotFoundError, result is NotFoundError
  */
-export function map<V, U>(value: V, fn: (v: Exclude<V, Error>) => U): Extract<V, Error> | U {
+export function map<V, U>(
+  value: V,
+  fn: (v: Exclude<V, Error>) => U,
+): Extract<V, Error> | U {
   if (value instanceof Error) {
     return value as Extract<V, Error>
   }
@@ -93,7 +96,10 @@ export function tap<V>(value: V, fn: (v: Exclude<V, Error>) => void): V {
  *   await logToService(u)
  * })
  */
-export async function tapAsync<V>(value: V, fn: (v: Exclude<V, Error>) => Promise<void>): Promise<V> {
+export async function tapAsync<V>(
+  value: V,
+  fn: (v: Exclude<V, Error>) => Promise<void>,
+): Promise<V> {
   if (!(value instanceof Error)) {
     await fn(value as Exclude<V, Error>)
   }

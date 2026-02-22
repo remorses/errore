@@ -47,19 +47,20 @@ class NetworkError extends TaggedError('NetworkError')<{
 type User = { id: string; name: string }
 
 // Helper functions that return union types (realistic pattern)
-function getUser(found: boolean): NotFoundError | User  {
+function getUser(found: boolean): NotFoundError | User {
   if (!found) return new NotFoundError({ id: '123' })
   return { id: '1', name: 'Alice' }
 }
 // Helper functions that return union types (realistic pattern)
-function mixedError(found: boolean): NotFoundError | User | Error  {
+function mixedError(found: boolean): NotFoundError | User | Error {
   if (!found) return new NotFoundError({ id: '123' })
   return { id: '1', name: 'Alice' }
 }
 
 function parseNumber(s: string): ValidationError | number {
   const n = parseInt(s, 10)
-  if (isNaN(n)) return new ValidationError({ field: 'input', message: 'Not a number' })
+  if (isNaN(n))
+    return new ValidationError({ field: 'input', message: 'Not a number' })
   return n
 }
 
@@ -136,7 +137,8 @@ describe('tryFn', () => {
   test('custom catch returns typed error', () => {
     const result = tryFn({
       try: () => JSON.parse('invalid'),
-      catch: () => new ValidationError({ field: 'json', message: 'Invalid JSON' }),
+      catch: () =>
+        new ValidationError({ field: 'json', message: 'Invalid JSON' }),
     })
 
     if (result instanceof ValidationError) {
@@ -197,7 +199,10 @@ describe('map', () => {
 describe('mapError', () => {
   test('transforms error type', () => {
     const result = getUser(false)
-    const mapped = mapError(result, (e) => new NetworkError({ url: '/api', message: e.message }))
+    const mapped = mapError(
+      result,
+      (e) => new NetworkError({ url: '/api', message: e.message }),
+    )
 
     if (mapped instanceof Error) {
       // TypeScript knows: mapped is NetworkError
@@ -221,7 +226,11 @@ describe('andThen', () => {
 
   test('chains multiple errore functions', () => {
     function divide(a: number, b: number): ValidationError | number {
-      if (b === 0) return new ValidationError({ field: 'divisor', message: 'Cannot divide by zero' })
+      if (b === 0)
+        return new ValidationError({
+          field: 'divisor',
+          message: 'Cannot divide by zero',
+        })
       return a / b
     }
 
@@ -242,7 +251,11 @@ describe('composing multiple operations', () => {
   }>() {}
 
   function validatePositive(n: number): ValidationError | number {
-    if (n <= 0) return new ValidationError({ field: 'number', message: 'Must be positive' })
+    if (n <= 0)
+      return new ValidationError({
+        field: 'number',
+        message: 'Must be positive',
+      })
     return n
   }
 
@@ -252,16 +265,17 @@ describe('composing multiple operations', () => {
   }
 
   test('compose with nested andThen calls', () => {
-    const result = andThen(
-      andThen(parseNumber('10'), validatePositive),
-      (n) => divide(100, n)
+    const result = andThen(andThen(parseNumber('10'), validatePositive), (n) =>
+      divide(100, n),
     )
 
     expect(result).toBe(10)
   })
 
   test('step-by-step composition with early returns', () => {
-    function calculate(input: string): ValidationError | DivisionError | number {
+    function calculate(
+      input: string,
+    ): ValidationError | DivisionError | number {
       const parsed = parseNumber(input)
       if (parsed instanceof Error) return parsed
 
@@ -278,7 +292,9 @@ describe('composing multiple operations', () => {
   })
 
   test('error type is union of all possible errors', () => {
-    function calculate(input: string): ValidationError | DivisionError | number {
+    function calculate(
+      input: string,
+    ): ValidationError | DivisionError | number {
       const parsed = parseNumber(input)
       if (parsed instanceof Error) return parsed
 
@@ -287,7 +303,7 @@ describe('composing multiple operations', () => {
     }
 
     // TypeScript knows the error is ValidationError | DivisionError
-    const result = calculate('0')  // divide by zero
+    const result = calculate('0') // divide by zero
     if (result instanceof Error) {
       // Can use matchError with all possible error types
       const message = matchError(result, {
@@ -305,14 +321,19 @@ describe('composing multiple operations', () => {
       message: string
     }>() {}
 
-    function calculate(input: string): ValidationError | DivisionError | number {
+    function calculate(
+      input: string,
+    ): ValidationError | DivisionError | number {
       const parsed = parseNumber(input)
       if (parsed instanceof Error) return parsed
       return divide(100, parsed)
     }
 
     const result = calculate('0')
-    const normalized = mapError(result, (e) => new AppError({ source: e._tag, message: e.message }))
+    const normalized = mapError(
+      result,
+      (e) => new AppError({ source: e._tag, message: e.message }),
+    )
 
     if (normalized instanceof Error) {
       expect(normalized._tag).toBe('AppError')
@@ -323,7 +344,7 @@ describe('composing multiple operations', () => {
   test('compose map and andThen', () => {
     const result = map(
       andThen(parseNumber('5'), (n) => divide(100, n)),
-      (n) => `Result: ${n}`
+      (n) => `Result: ${n}`,
     )
 
     expect(result).toBe('Result: 20')
@@ -337,12 +358,15 @@ describe('async composition', () => {
   }
 
   async function processValue(n: number): Promise<ValidationError | string> {
-    if (n < 0) return new ValidationError({ field: 'value', message: 'Negative' })
+    if (n < 0)
+      return new ValidationError({ field: 'value', message: 'Negative' })
     return `processed: ${n}`
   }
 
   test('async step-by-step composition', async () => {
-    async function pipeline(id: string): Promise<NotFoundError | ValidationError | string> {
+    async function pipeline(
+      id: string,
+    ): Promise<NotFoundError | ValidationError | string> {
       const value = await fetchValue(id)
       if (value instanceof Error) return value
 
@@ -359,10 +383,7 @@ describe('async composition', () => {
   test('async with andThenAsync', async () => {
     const { andThenAsync } = await import('./index.js')
 
-    const result = await andThenAsync(
-      await fetchValue('123'),
-      processValue
-    )
+    const result = await andThenAsync(await fetchValue('123'), processValue)
 
     expect(result).toBe('processed: 42')
   })
@@ -527,7 +548,8 @@ describe('matchError', () => {
   test('Error handler with mixed tagged and plain errors', () => {
     function getError(type: string): NotFoundError | ValidationError | Error {
       if (type === 'notfound') return new NotFoundError({ id: '1' })
-      if (type === 'validation') return new ValidationError({ field: 'email', message: 'Invalid' })
+      if (type === 'validation')
+        return new ValidationError({ field: 'email', message: 'Invalid' })
       return new Error('Unknown')
     }
 
@@ -559,7 +581,7 @@ describe('matchError', () => {
     const message = matchErrorPartial(
       err,
       { Error: (e) => `Caught plain: ${e.message}` },
-      () => 'fallback'
+      () => 'fallback',
     )
     expect(message).toBe('Caught plain: Oops')
   })
@@ -570,7 +592,9 @@ describe('matchError', () => {
 // ============================================================================
 
 describe('real-world: fetch user flow', () => {
-  async function fetchUser(id: string): Promise<NotFoundError | NetworkError | User> {
+  async function fetchUser(
+    id: string,
+  ): Promise<NotFoundError | NetworkError | User> {
     if (id === 'network-fail') {
       return new NetworkError({ url: '/users', message: 'Connection failed' })
     }
@@ -609,7 +633,6 @@ describe('real-world: fetch user flow', () => {
       ok: (u) => `Got user: ${u.name}`,
       err: (e) => `Failed: ${e.message}`,
     })
-
 
     expect(message).toBe('Failed: Connection failed')
   })
@@ -685,7 +708,8 @@ describe('Error | T | null (Result + Option combined)', () => {
 
 describe('Error | T | undefined', () => {
   function lookup(key: string): NetworkError | string | undefined {
-    if (key === 'error') return new NetworkError({ url: '/lookup', message: 'Failed' })
+    if (key === 'error')
+      return new NetworkError({ url: '/lookup', message: 'Failed' })
     if (key === 'missing') return undefined
     return 'found-value'
   }
@@ -720,8 +744,11 @@ describe('Error | T | undefined', () => {
 
 describe('complex: Error | T | null | undefined', () => {
   // Even triple union works naturally!
-  function query(sql: string): ValidationError | { rows: string[] } | null | undefined {
-    if (sql === 'invalid') return new ValidationError({ field: 'sql', message: 'Bad query' })
+  function query(
+    sql: string,
+  ): ValidationError | { rows: string[] } | null | undefined {
+    if (sql === 'invalid')
+      return new ValidationError({ field: 'sql', message: 'Bad query' })
     if (sql === 'empty') return null
     if (sql === 'no-table') return undefined
     return { rows: ['a', 'b', 'c'] }
@@ -798,7 +825,10 @@ describe('TaggedError with custom base class', () => {
   })
 
   test('static is() still works', () => {
-    const err: Error = new NotFoundAppError({ id: '123', message: 'User not found' })
+    const err: Error = new NotFoundAppError({
+      id: '123',
+      message: 'User not found',
+    })
 
     expect(NotFoundAppError.is(err)).toBe(true)
     expect(ServerAppError.is(err)).toBe(false)
@@ -1014,7 +1044,6 @@ describe('createTaggedError factory', () => {
       message: 'User $id not found in $database',
     })
 
-
     const err = new NotFoundError({ id: '123', database: 'users' })
 
     expect(err.message).toBe('User 123 not found in users')
@@ -1076,7 +1105,6 @@ describe('createTaggedError factory', () => {
 
     const originalError = new Error('original')
     const err = new WrapperError({ item: 'data', cause: originalError })
-
 
     expect(err.cause).toBe(originalError)
     expect(err.message).toBe('Failed to process data')
@@ -1210,7 +1238,9 @@ describe('createTaggedError factory', () => {
       message: 'Error B: $msg',
     })
 
-    function getError(type: string): InstanceType<typeof ErrorA> | InstanceType<typeof ErrorB> {
+    function getError(
+      type: string,
+    ): InstanceType<typeof ErrorA> | InstanceType<typeof ErrorB> {
       if (type === 'a') {
         return new ErrorA({ msg: 'from A' })
       }
@@ -1323,7 +1353,10 @@ describe('createTaggedError factory', () => {
 
     const err = new NotFoundError({ id: '123', database: 'users' })
 
-    expect(err.fingerprint).toEqual(['NotFoundError', 'User $id not found in $database'])
+    expect(err.fingerprint).toEqual([
+      'NotFoundError',
+      'User $id not found in $database',
+    ])
   })
 
   test('fingerprint is stable across different interpolated values', () => {
@@ -1349,7 +1382,10 @@ describe('createTaggedError factory', () => {
     const json = err.toJSON() as Record<string, unknown>
 
     expect(json.messageTemplate).toBe('Error with $code and $detail')
-    expect(json.fingerprint).toEqual(['TestError', 'Error with $code and $detail'])
+    expect(json.fingerprint).toEqual([
+      'TestError',
+      'Error with $code and $detail',
+    ])
   })
 
   test('error without variables has static messageTemplate', () => {
@@ -1377,7 +1413,10 @@ describe('reserved key collisions', () => {
     }>() {}
 
     // Should not throw during construction
-    const err = new FingerprintError({ fingerprint: 'user-provided', message: 'test' })
+    const err = new FingerprintError({
+      fingerprint: 'user-provided',
+      message: 'test',
+    })
 
     // Internal fingerprint getter must win over user-provided value
     expect(err.fingerprint).toEqual(['FingerprintError'])
@@ -1405,7 +1444,10 @@ describe('reserved key collisions', () => {
     const err = new TestError({ fingerprint: 'user-value' })
 
     // fingerprint getter must return stable internal value
-    expect(err.fingerprint).toEqual(['TestError', 'Error with $fingerprint value'])
+    expect(err.fingerprint).toEqual([
+      'TestError',
+      'Error with $fingerprint value',
+    ])
     expect(err.messageTemplate).toBe('Error with $fingerprint value')
     // The message still interpolates the value
     expect(err.message).toBe('Error with user-value value')
@@ -1427,42 +1469,66 @@ describe('reserved key collisions', () => {
   })
 
   test('createTaggedError: forbids reserved variable $name', () => {
-    expect(() => createTaggedError({
-      name: 'TestError',
-      message: 'Error for $name',
-    })).toThrow('$name is reserved')
+    expect(() =>
+      createTaggedError({
+        name: 'TestError',
+        message: 'Error for $name',
+      }),
+    ).toThrow('$name is reserved')
   })
 
   test('createTaggedError: forbids reserved variable $cause', () => {
-    expect(() => createTaggedError({
-      name: 'TestError',
-      message: 'Error from $cause',
-    })).toThrow('$cause is reserved')
+    expect(() =>
+      createTaggedError({
+        name: 'TestError',
+        message: 'Error from $cause',
+      }),
+    ).toThrow('$cause is reserved')
   })
 
   test('createTaggedError: forbids reserved variable $_tag', () => {
-    expect(() => createTaggedError({
-      name: 'TestError',
-      message: 'Error with $_tag',
-    })).toThrow('$_tag is reserved')
+    expect(() =>
+      createTaggedError({
+        name: 'TestError',
+        message: 'Error with $_tag',
+      }),
+    ).toThrow('$_tag is reserved')
   })
 
   test('createTaggedError: forbids reserved variable $stack', () => {
-    expect(() => createTaggedError({
-      name: 'TestError',
-      message: 'Error at $stack',
-    })).toThrow('$stack is reserved')
+    expect(() =>
+      createTaggedError({
+        name: 'TestError',
+        message: 'Error at $stack',
+      }),
+    ).toThrow('$stack is reserved')
   })
 })
 
 describe('findCause', () => {
-  class RootError extends TaggedError('RootError')<{ id: string; message: string }>() {}
-  class MiddleError extends TaggedError('MiddleError')<{ step: string; message: string; cause: Error }>() {}
-  class TopError extends TaggedError('TopError')<{ message: string; cause: Error }>() {}
-  class UnrelatedError extends TaggedError('UnrelatedError')<{ message: string }>() {}
+  class RootError extends TaggedError('RootError')<{
+    id: string
+    message: string
+  }>() {}
+  class MiddleError extends TaggedError('MiddleError')<{
+    step: string
+    message: string
+    cause: Error
+  }>() {}
+  class TopError extends TaggedError('TopError')<{
+    message: string
+    cause: Error
+  }>() {}
+  class UnrelatedError extends TaggedError('UnrelatedError')<{
+    message: string
+  }>() {}
 
   const root = new RootError({ id: '123', message: 'not found' })
-  const middle = new MiddleError({ step: 'fetch', message: 'fetch failed', cause: root })
+  const middle = new MiddleError({
+    step: 'fetch',
+    message: 'fetch failed',
+    cause: root,
+  })
   const top = new TopError({ message: 'service error', cause: middle })
 
   test('standalone findCause finds self', () => {
@@ -1549,10 +1615,15 @@ describe('findCause', () => {
       statusCode = 500
     }
 
-    class DbError extends TaggedError('DbError', AppError)<{ message: string }>() {
+    class DbError extends TaggedError('DbError', AppError)<{
+      message: string
+    }>() {
       statusCode = 503
     }
-    class ApiError extends TaggedError('ApiError', AppError)<{ message: string; cause: Error }>() {
+    class ApiError extends TaggedError('ApiError', AppError)<{
+      message: string
+      cause: Error
+    }>() {
       statusCode = 502
     }
 

@@ -43,9 +43,13 @@ async function renderSection(section: Section): Promise<string> {
 
   if (section.codeBlocks.length < 2) {
     // Not a comparison section, just render prose + any single code block
-    const codeHtml = section.codeBlocks.length === 1
-      ? await highlightCode(section.codeBlocks[0].code, section.codeBlocks[0].lang)
-      : ''
+    const codeHtml =
+      section.codeBlocks.length === 1
+        ? await highlightCode(
+            section.codeBlocks[0].code,
+            section.codeBlocks[0].lang,
+          )
+        : ''
     return `<section class="comparison-section">${proseHtml}${codeHtml}</section>`
   }
 

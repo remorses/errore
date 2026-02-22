@@ -10,27 +10,28 @@ Four progressive examples showing how errore eliminates nested try/catch while k
 
 ```ts
 async function getTodo(
-  id: number
+  id: number,
 ): Promise<
   | { ok: true; todo: any }
-  | { ok: false; error: "InvalidJson" | "RequestFailed" }
+  | { ok: false; error: 'InvalidJson' | 'RequestFailed' }
 > {
   try {
     const response = await fetch(`/todos/${id}`)
-    if (!response.ok) throw new Error("Not OK!")
+    if (!response.ok) throw new Error('Not OK!')
     try {
       const todo = await response.json()
       return { ok: true, todo }
     } catch (jsonError) {
-      return { ok: false, error: "InvalidJson" }
+      return { ok: false, error: 'InvalidJson' }
     }
   } catch (error) {
-    return { ok: false, error: "RequestFailed" }
+    return { ok: false, error: 'RequestFailed' }
   }
 }
 ```
 
 **Problems:**
+
 - Nested try/catch to distinguish fetch errors from JSON parse errors
 - Manual `{ ok, error }` discriminant — TypeScript can't enforce exhaustive handling
 - `throw new Error("Not OK!")` just to jump to the outer catch — using exceptions for control flow
@@ -39,30 +40,32 @@ async function getTodo(
 ### After
 
 ```ts
-import * as errore from "errore"
+import * as errore from 'errore'
 
 class InvalidJsonError extends errore.createTaggedError({
-  name: "InvalidJsonError",
-  message: "Failed to parse response for todo $id",
+  name: 'InvalidJsonError',
+  message: 'Failed to parse response for todo $id',
 }) {}
 
 class RequestFailedError extends errore.createTaggedError({
-  name: "RequestFailedError",
-  message: "Request failed for todo $id",
+  name: 'RequestFailedError',
+  message: 'Request failed for todo $id',
 }) {}
 
 async function getTodo(
-  id: number
+  id: number,
 ): Promise<InvalidJsonError | RequestFailedError | { todo: any }> {
-  const response = await fetch(`/todos/${id}`)
-    .catch((e) => new RequestFailedError({ id: String(id), cause: e }))
+  const response = await fetch(`/todos/${id}`).catch(
+    (e) => new RequestFailedError({ id: String(id), cause: e }),
+  )
   if (response instanceof Error) return response
 
   if (!response.ok) {
     return new RequestFailedError({ id: String(id) })
   }
 
-  const body = await response.json()
+  const body = await response
+    .json()
     .catch((e) => new InvalidJsonError({ id: String(id), cause: e }))
   if (body instanceof Error) return body
 
@@ -71,6 +74,7 @@ async function getTodo(
 ```
 
 **What changed:**
+
 - No try/catch at all — `.catch()` converts exceptions to values
 - Each error is a distinct class with typed properties and a `cause` chain
 - Flat control flow: check, return early, continue
@@ -107,20 +111,20 @@ function getTodo(
   {
     retries = 3,
     retryBaseDelay = 1000,
-  }: { retries?: number; retryBaseDelay?: number }
+  }: { retries?: number; retryBaseDelay?: number },
 ): Promise<
   | { ok: true; todo: any }
-  | { ok: false; error: "InvalidJson" | "RequestFailed" }
+  | { ok: false; error: 'InvalidJson' | 'RequestFailed' }
 > {
   async function execute(
-    attempt: number
+    attempt: number,
   ): Promise<
     | { ok: true; todo: any }
-    | { ok: false; error: "InvalidJson" | "RequestFailed" }
+    | { ok: false; error: 'InvalidJson' | 'RequestFailed' }
   > {
     try {
       const response = await fetch(`/todos/${id}`)
-      if (!response.ok) throw new Error("Not OK!")
+      if (!response.ok) throw new Error('Not OK!')
       try {
         const todo = await response.json()
         return { ok: true, todo }
@@ -128,16 +132,16 @@ function getTodo(
         if (attempt < retries) {
           throw jsonError // jump to retry
         }
-        return { ok: false, error: "InvalidJson" }
+        return { ok: false, error: 'InvalidJson' }
       }
     } catch (error) {
       if (attempt < retries) {
         const delayMs = retryBaseDelay * 2 ** attempt
         return new Promise((resolve) =>
-          setTimeout(() => resolve(execute(attempt + 1)), delayMs)
+          setTimeout(() => resolve(execute(attempt + 1)), delayMs),
         )
       }
-      return { ok: false, error: "RequestFailed" }
+      return { ok: false, error: 'RequestFailed' }
     }
   }
 
@@ -146,6 +150,7 @@ function getTodo(
 ```
 
 **Problems:**
+
 - `throw jsonError` is used to jump from the inner catch to the outer catch for retry — spaghetti control flow
 - Retry logic is tangled with error discrimination
 - The type signature is duplicated for both `getTodo` and `execute`
@@ -154,18 +159,18 @@ function getTodo(
 ### After
 
 ```ts
-import * as errore from "errore"
+import * as errore from 'errore'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 class InvalidJsonError extends errore.createTaggedError({
-  name: "InvalidJsonError",
-  message: "Failed to parse response for todo $id",
+  name: 'InvalidJsonError',
+  message: 'Failed to parse response for todo $id',
 }) {}
 
 class RequestFailedError extends errore.createTaggedError({
-  name: "RequestFailedError",
-  message: "Request failed for todo $id after $attempts attempts",
+  name: 'RequestFailedError',
+  message: 'Request failed for todo $id after $attempts attempts',
 }) {}
 
 async function getTodo(
@@ -173,17 +178,17 @@ async function getTodo(
   {
     retries = 3,
     retryBaseDelay = 1000,
-  }: { retries?: number; retryBaseDelay?: number }
+  }: { retries?: number; retryBaseDelay?: number },
 ): Promise<InvalidJsonError | RequestFailedError | { todo: any }> {
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const response = await fetch(`/todos/${id}`)
-      .catch((e) =>
+    const response = await fetch(`/todos/${id}`).catch(
+      (e) =>
         new RequestFailedError({
           id: String(id),
           attempts: String(attempt + 1),
           cause: e,
         }),
-      )
+    )
 
     if (response instanceof Error) {
       if (attempt < retries) {
@@ -204,10 +209,9 @@ async function getTodo(
       })
     }
 
-    const body = await response.json()
-      .catch((e) =>
-        new InvalidJsonError({ id: String(id), cause: e }),
-      )
+    const body = await response
+      .json()
+      .catch((e) => new InvalidJsonError({ id: String(id), cause: e }))
 
     if (body instanceof Error) {
       if (attempt < retries) {
@@ -228,6 +232,7 @@ async function getTodo(
 ```
 
 **What changed:**
+
 - Retry is a plain `for` loop — no recursive `execute()`, no `throw` to jump between catch blocks
 - Each failure point independently decides whether to retry or return
 - The error includes `attempts` so callers know how many tries were made
@@ -250,29 +255,29 @@ function getTodo(
     retries?: number
     retryBaseDelay?: number
     signal?: AbortSignal
-  }
+  },
 ): Promise<
   | { ok: true; todo: any }
   | {
       ok: false
-      error: "InvalidJson" | "RequestFailed" | "Timeout"
+      error: 'InvalidJson' | 'RequestFailed' | 'Timeout'
     }
 > {
   async function execute(attempt: number): Promise<
     | { ok: true; todo: any }
     | {
         ok: false
-        error: "InvalidJson" | "RequestFailed" | "Timeout"
+        error: 'InvalidJson' | 'RequestFailed' | 'Timeout'
       }
   > {
     try {
       const controller = new AbortController()
       setTimeout(() => controller.abort(), 1000)
-      signal?.addEventListener("abort", () => controller.abort())
+      signal?.addEventListener('abort', () => controller.abort())
       const response = await fetch(`/todos/${id}`, {
         signal: controller.signal,
       })
-      if (!response.ok) throw new Error("Not OK!")
+      if (!response.ok) throw new Error('Not OK!')
       try {
         const todo = await response.json()
         return { ok: true, todo }
@@ -280,18 +285,18 @@ function getTodo(
         if (attempt < retries) {
           throw jsonError // jump to retry
         }
-        return { ok: false, error: "InvalidJson" }
+        return { ok: false, error: 'InvalidJson' }
       }
     } catch (error) {
-      if ((error as Error).name === "AbortError") {
-        return { ok: false, error: "Timeout" }
+      if ((error as Error).name === 'AbortError') {
+        return { ok: false, error: 'Timeout' }
       } else if (attempt < retries) {
         const delayMs = retryBaseDelay * 2 ** attempt
         return new Promise((resolve) =>
-          setTimeout(() => resolve(execute(attempt + 1)), delayMs)
+          setTimeout(() => resolve(execute(attempt + 1)), delayMs),
         )
       }
-      return { ok: false, error: "RequestFailed" }
+      return { ok: false, error: 'RequestFailed' }
     }
   }
 
@@ -300,6 +305,7 @@ function getTodo(
 ```
 
 **Problems:**
+
 - `(error as Error).name === "AbortError"` — stringly-typed runtime check with a type cast
 - AbortError check is inside the same catch that handles network errors and JSON errors — timeout vs failure is ambiguous
 - The outer catch now handles three different concerns: timeout, retry, and final failure
@@ -308,23 +314,23 @@ function getTodo(
 ### After
 
 ```ts
-import * as errore from "errore"
+import * as errore from 'errore'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 class InvalidJsonError extends errore.createTaggedError({
-  name: "InvalidJsonError",
-  message: "Failed to parse response for todo $id",
+  name: 'InvalidJsonError',
+  message: 'Failed to parse response for todo $id',
 }) {}
 
 class RequestFailedError extends errore.createTaggedError({
-  name: "RequestFailedError",
-  message: "Request failed for todo $id after $attempts attempts",
+  name: 'RequestFailedError',
+  message: 'Request failed for todo $id after $attempts attempts',
 }) {}
 
 class TimeoutError extends errore.createTaggedError({
-  name: "TimeoutError",
-  message: "Request timed out for todo $id",
+  name: 'TimeoutError',
+  message: 'Request timed out for todo $id',
   extends: errore.AbortError,
 }) {}
 
@@ -338,28 +344,31 @@ async function getTodo(
     retries?: number
     retryBaseDelay?: number
     signal?: AbortSignal
-  }
-): Promise<
-  InvalidJsonError | RequestFailedError | { todo: any }
-> {
+  },
+): Promise<InvalidJsonError | RequestFailedError | { todo: any }> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     // Abort handling: combine caller signal with per-request timeout
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(new TimeoutError({ id: String(id) })), 1000)
+    const timeout = setTimeout(
+      () => controller.abort(new TimeoutError({ id: String(id) })),
+      1000,
+    )
     const onAbort = () => controller.abort()
-    signal?.addEventListener("abort", onAbort, { once: true })
+    signal?.addEventListener('abort', onAbort, { once: true })
 
-    const response = await fetch(`/todos/${id}`, { signal: controller.signal })
-      .catch((e) =>
+    const response = await fetch(`/todos/${id}`, {
+      signal: controller.signal,
+    }).catch(
+      (e) =>
         new RequestFailedError({
           id: String(id),
           attempts: String(attempt + 1),
           cause: e,
         }),
-      )
+    )
 
     clearTimeout(timeout)
-    signal?.removeEventListener("abort", onAbort)
+    signal?.removeEventListener('abort', onAbort)
 
     // Abort errors (timeout) are never retried
     if (errore.isAbortError(response)) return response
@@ -383,10 +392,9 @@ async function getTodo(
       })
     }
 
-    const body = await response.json()
-      .catch((e) =>
-        new InvalidJsonError({ id: String(id), cause: e }),
-      )
+    const body = await response
+      .json()
+      .catch((e) => new InvalidJsonError({ id: String(id), cause: e }))
 
     if (body instanceof Error) {
       if (attempt < retries) {
@@ -407,6 +415,7 @@ async function getTodo(
 ```
 
 **What changed:**
+
 - `TimeoutError extends errore.AbortError` — a typed abort reason instead of `(error as Error).name === "AbortError"` string checks
 - `controller.abort(new TimeoutError(...))` passes a typed reason — the browser's `AbortError` wraps it as the cause, so `errore.isAbortError()` can detect it inside the `RequestFailedError` cause chain
 - Timeout is explicitly never retried (`if (errore.isAbortError(response)) return response`) — this policy is visible, not buried in a conditional
@@ -420,7 +429,7 @@ async function getTodo(
 ### Before
 
 ```ts
-const tracer = Otel.trace.getTracer("todos")
+const tracer = Otel.trace.getTracer('todos')
 
 function getTodo(
   id: number,
@@ -432,16 +441,16 @@ function getTodo(
     retries?: number
     retryBaseDelay?: number
     signal?: AbortSignal
-  }
+  },
 ): Promise<
   | { ok: true; todo: any }
   | {
       ok: false
-      error: "InvalidJson" | "RequestFailed" | "Timeout"
+      error: 'InvalidJson' | 'RequestFailed' | 'Timeout'
     }
 > {
   return tracer.startActiveSpan(
-    "getTodo",
+    'getTodo',
     { attributes: { id } },
     async (span) => {
       try {
@@ -458,24 +467,24 @@ function getTodo(
       } finally {
         span.end()
       }
-    }
+    },
   )
 
   async function execute(attempt: number): Promise<
     | { ok: true; todo: any }
     | {
         ok: false
-        error: "InvalidJson" | "RequestFailed" | "Timeout"
+        error: 'InvalidJson' | 'RequestFailed' | 'Timeout'
       }
   > {
     try {
       const controller = new AbortController()
       setTimeout(() => controller.abort(), 1000)
-      signal?.addEventListener("abort", () => controller.abort())
+      signal?.addEventListener('abort', () => controller.abort())
       const response = await fetch(`/todos/${id}`, {
         signal: controller.signal,
       })
-      if (!response.ok) throw new Error("Not OK!")
+      if (!response.ok) throw new Error('Not OK!')
       try {
         const todo = await response.json()
         return { ok: true, todo }
@@ -483,24 +492,25 @@ function getTodo(
         if (attempt < retries) {
           throw jsonError
         }
-        return { ok: false, error: "InvalidJson" }
+        return { ok: false, error: 'InvalidJson' }
       }
     } catch (error) {
-      if ((error as Error).name === "AbortError") {
-        return { ok: false, error: "Timeout" }
+      if ((error as Error).name === 'AbortError') {
+        return { ok: false, error: 'Timeout' }
       } else if (attempt < retries) {
         const delayMs = retryBaseDelay * 2 ** attempt
         return new Promise((resolve) =>
-          setTimeout(() => resolve(execute(attempt + 1)), delayMs)
+          setTimeout(() => resolve(execute(attempt + 1)), delayMs),
         )
       }
-      return { ok: false, error: "RequestFailed" }
+      return { ok: false, error: 'RequestFailed' }
     }
   }
 }
 ```
 
 **Problems:**
+
 - The tracing wrapper adds another layer of nesting around already-complex code
 - `span.setStatus` checks `result.ok` / `result.error` — duplicating the error discrimination logic
 - The `result.error` string is the only info passed to the span — no structured error data, no cause chain
@@ -510,24 +520,24 @@ function getTodo(
 ### After
 
 ```ts
-import * as errore from "errore"
+import * as errore from 'errore'
 
-const tracer = Otel.trace.getTracer("todos")
+const tracer = Otel.trace.getTracer('todos')
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 class InvalidJsonError extends errore.createTaggedError({
-  name: "InvalidJsonError",
-  message: "Failed to parse response for todo $id",
+  name: 'InvalidJsonError',
+  message: 'Failed to parse response for todo $id',
 }) {}
 
 class RequestFailedError extends errore.createTaggedError({
-  name: "RequestFailedError",
-  message: "Request failed for todo $id after $attempts attempts",
+  name: 'RequestFailedError',
+  message: 'Request failed for todo $id after $attempts attempts',
 }) {}
 
 class TimeoutError extends errore.createTaggedError({
-  name: "TimeoutError",
-  message: "Request timed out for todo $id",
+  name: 'TimeoutError',
+  message: 'Request timed out for todo $id',
   extends: errore.AbortError,
 }) {}
 
@@ -541,12 +551,10 @@ async function getTodo(
     retries?: number
     retryBaseDelay?: number
     signal?: AbortSignal
-  }
-): Promise<
-  InvalidJsonError | RequestFailedError | { todo: any }
-> {
+  },
+): Promise<InvalidJsonError | RequestFailedError | { todo: any }> {
   return tracer.startActiveSpan(
-    "getTodo",
+    'getTodo',
     { attributes: { id } },
     async (span) => {
       const result = await execute()
@@ -561,7 +569,7 @@ async function getTodo(
       }
       span.end()
       return result
-    }
+    },
   )
 
   async function execute(): Promise<
@@ -569,21 +577,26 @@ async function getTodo(
   > {
     for (let attempt = 0; attempt <= retries; attempt++) {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(new TimeoutError({ id: String(id) })), 1000)
+      const timeout = setTimeout(
+        () => controller.abort(new TimeoutError({ id: String(id) })),
+        1000,
+      )
       const onAbort = () => controller.abort()
-      signal?.addEventListener("abort", onAbort, { once: true })
+      signal?.addEventListener('abort', onAbort, { once: true })
 
-      const response = await fetch(`/todos/${id}`, { signal: controller.signal })
-        .catch((e) =>
+      const response = await fetch(`/todos/${id}`, {
+        signal: controller.signal,
+      }).catch(
+        (e) =>
           new RequestFailedError({
             id: String(id),
             attempts: String(attempt + 1),
             cause: e,
           }),
-        )
+      )
 
       clearTimeout(timeout)
-      signal?.removeEventListener("abort", onAbort)
+      signal?.removeEventListener('abort', onAbort)
 
       // Abort errors (timeout) are never retried
       if (errore.isAbortError(response)) return response
@@ -607,10 +620,9 @@ async function getTodo(
         })
       }
 
-      const body = await response.json()
-        .catch((e) =>
-          new InvalidJsonError({ id: String(id), cause: e }),
-        )
+      const body = await response
+        .json()
+        .catch((e) => new InvalidJsonError({ id: String(id), cause: e }))
 
       if (body instanceof Error) {
         if (attempt < retries) {
@@ -632,6 +644,7 @@ async function getTodo(
 ```
 
 **What changed:**
+
 - The tracing wrapper is one `instanceof Error` check — no `result.ok` / `result.error` string matching
 - `span.recordException(result)` works directly because errors are real `Error` instances with stack traces and cause chains — OpenTelemetry gets structured data for free
 - No try/finally needed — since errors are values, `span.end()` is just the next line
@@ -642,17 +655,17 @@ async function getTodo(
 
 ## Summary
 
-| Concern | `{ ok, error }` pattern | errore |
-|---|---|---|
-| Error types | String literals (`"InvalidJson"`) | Real classes with typed properties |
-| Type safety at call site | Manual `result.ok` check | `instanceof Error` narrows the union |
-| Exhaustive handling | Not enforced | `matchError` is compile-time exhaustive |
-| Control flow | Nested try/catch, throw for jumps | Flat: check, return, continue |
-| Retries | Recursive `execute()` + throw to outer catch | `for` loop + `continue` |
-| Error context | Just a string | Structured properties + cause chain |
-| Resource cleanup | Nested try/finally per resource | `await using` + `DisposableStack.defer()` |
-| Tracing integration | `result.error` string to span | `span.recordException(error)` with full stack |
-| Composability | Each layer adds nesting | Each layer is another `if (x instanceof Error)` |
+| Concern                  | `{ ok, error }` pattern                      | errore                                          |
+| ------------------------ | -------------------------------------------- | ----------------------------------------------- |
+| Error types              | String literals (`"InvalidJson"`)            | Real classes with typed properties              |
+| Type safety at call site | Manual `result.ok` check                     | `instanceof Error` narrows the union            |
+| Exhaustive handling      | Not enforced                                 | `matchError` is compile-time exhaustive         |
+| Control flow             | Nested try/catch, throw for jumps            | Flat: check, return, continue                   |
+| Retries                  | Recursive `execute()` + throw to outer catch | `for` loop + `continue`                         |
+| Error context            | Just a string                                | Structured properties + cause chain             |
+| Resource cleanup         | Nested try/finally per resource              | `await using` + `DisposableStack.defer()`       |
+| Tracing integration      | `result.error` string to span                | `span.recordException(error)` with full stack   |
+| Composability            | Each layer adds nesting                      | Each layer is another `if (x instanceof Error)` |
 
 ---
 
@@ -663,27 +676,31 @@ Managing multiple resources that need cleanup — regardless of success or failu
 ### Before
 
 ```ts
-async function processOrder(orderId: string): Promise<
+async function processOrder(
+  orderId: string,
+): Promise<
   | { ok: true; receipt: Receipt }
-  | { ok: false; error: "DbError" | "CacheError" | "ProcessingError" }
+  | { ok: false; error: 'DbError' | 'CacheError' | 'ProcessingError' }
 > {
   const db = await connectDb()
   try {
     const cache = await openCache()
     try {
-      const order = await db.query(`SELECT * FROM orders WHERE id = $1`, [orderId])
-      if (!order) return { ok: false, error: "DbError" }
+      const order = await db.query(`SELECT * FROM orders WHERE id = $1`, [
+        orderId,
+      ])
+      if (!order) return { ok: false, error: 'DbError' }
 
       const receipt = await processPayment(order)
       await cache.set(`receipt:${orderId}`, receipt)
       return { ok: true, receipt }
     } catch (e) {
-      return { ok: false, error: "ProcessingError" }
+      return { ok: false, error: 'ProcessingError' }
     } finally {
       await cache.flush()
     }
   } catch (e) {
-    return { ok: false, error: "DbError" }
+    return { ok: false, error: 'DbError' }
   } finally {
     await db.close()
   }
@@ -691,6 +708,7 @@ async function processOrder(orderId: string): Promise<
 ```
 
 **Problems:**
+
 - Nested try/finally for each resource — deeper nesting with every new resource
 - Error handling and cleanup are tangled together in the same blocks
 - If `cache.flush()` throws, it masks the original error
@@ -699,44 +717,46 @@ async function processOrder(orderId: string): Promise<
 ### After
 
 ```ts
-import * as errore from "errore"
+import * as errore from 'errore'
 
 class DbError extends errore.createTaggedError({
-  name: "DbError",
-  message: "Database operation failed for order $orderId",
+  name: 'DbError',
+  message: 'Database operation failed for order $orderId',
 }) {}
 
 class CacheError extends errore.createTaggedError({
-  name: "CacheError",
-  message: "Cache operation failed for order $orderId",
+  name: 'CacheError',
+  message: 'Cache operation failed for order $orderId',
 }) {}
 
 class ProcessingError extends errore.createTaggedError({
-  name: "ProcessingError",
-  message: "Payment processing failed for order $orderId",
+  name: 'ProcessingError',
+  message: 'Payment processing failed for order $orderId',
 }) {}
 
 async function processOrder(
-  orderId: string
+  orderId: string,
 ): Promise<DbError | CacheError | ProcessingError | Receipt> {
   await using cleanup = new errore.AsyncDisposableStack()
 
-  const db = await connectDb()
-    .catch((e) => new DbError({ orderId, cause: e }))
+  const db = await connectDb().catch((e) => new DbError({ orderId, cause: e }))
   if (db instanceof Error) return db
   cleanup.defer(() => db.close())
 
-  const cache = await openCache()
-    .catch((e) => new CacheError({ orderId, cause: e }))
+  const cache = await openCache().catch(
+    (e) => new CacheError({ orderId, cause: e }),
+  )
   if (cache instanceof Error) return cache
   cleanup.defer(() => cache.flush())
 
-  const order = await db.query(`SELECT * FROM orders WHERE id = $1`, [orderId])
+  const order = await db
+    .query(`SELECT * FROM orders WHERE id = $1`, [orderId])
     .catch((e) => new DbError({ orderId, cause: e }))
   if (order instanceof Error) return order
 
-  const receipt = await processPayment(order)
-    .catch((e) => new ProcessingError({ orderId, cause: e }))
+  const receipt = await processPayment(order).catch(
+    (e) => new ProcessingError({ orderId, cause: e }),
+  )
   if (receipt instanceof Error) return receipt
 
   await cache.set(`receipt:${orderId}`, receipt)
@@ -746,6 +766,7 @@ async function processOrder(
 ```
 
 **What changed:**
+
 - `await using cleanup = new errore.AsyncDisposableStack()` replaces all nested try/finally blocks
 - `cleanup.defer()` registers cleanup in the order resources are acquired — they run in reverse (LIFO), so cache flushes before db closes
 - Cleanup runs on every exit path: normal return, early error return, or thrown exception
@@ -755,35 +776,36 @@ async function processOrder(
 ### Effect.ts equivalent
 
 ```ts
-import { Effect } from "effect"
+import { Effect } from 'effect'
 
 const processOrder = (orderId: string) =>
-  Effect.acquireRelease(
-    connectDbEffect,
-    (db) => Effect.promise(() => db.close())
+  Effect.acquireRelease(connectDbEffect, (db) =>
+    Effect.promise(() => db.close()),
   ).pipe(
     Effect.flatMap((db) =>
-      Effect.acquireRelease(
-        openCacheEffect,
-        (cache) => Effect.promise(() => cache.flush())
+      Effect.acquireRelease(openCacheEffect, (cache) =>
+        Effect.promise(() => cache.flush()),
       ).pipe(
         Effect.flatMap((cache) =>
           Effect.gen(function* () {
             const order = yield* Effect.tryPromise({
-              try: () => db.query(`SELECT * FROM orders WHERE id = $1`, [orderId]),
+              try: () =>
+                db.query(`SELECT * FROM orders WHERE id = $1`, [orderId]),
               catch: () => new DbError({ orderId }),
             })
             const receipt = yield* Effect.tryPromise({
               try: () => processPayment(order),
               catch: () => new ProcessingError({ orderId }),
             })
-            yield* Effect.promise(() => cache.set(`receipt:${orderId}`, receipt))
+            yield* Effect.promise(() =>
+              cache.set(`receipt:${orderId}`, receipt),
+            )
             return receipt
-          })
-        )
-      )
+          }),
+        ),
+      ),
     ),
-    Effect.scoped
+    Effect.scoped,
   )
 ```
 
@@ -801,19 +823,19 @@ A React server component that fetches a video with policy checks, handles passwo
 return Effect.gen(function* () {
   const videosPolicy = yield* VideosPolicy
 
-  const [video] = yield* Effect.promise(() =>
-    fetchVideo(videoId)
-  ).pipe(Policy.withPublicPolicy(videosPolicy.canView(videoId)))
+  const [video] = yield* Effect.promise(() => fetchVideo(videoId)).pipe(
+    Policy.withPublicPolicy(videosPolicy.canView(videoId)),
+  )
 
   return Option.fromNullable(video)
 }).pipe(
   Effect.flatten,
   Effect.map((video) => ({ needsPassword: false, video }) as const),
-  Effect.catchTag("VerifyVideoPasswordError", () =>
+  Effect.catchTag('VerifyVideoPasswordError', () =>
     Effect.succeed({ needsPassword: true } as const),
   ),
   Effect.map((data) => (
-    <div className="min-h-screen flex flex-col bg-[#F7F8FA]">
+    <div className='min-h-screen flex flex-col bg-[#F7F8FA]'>
       <PasswordOverlay isOpen={data.needsPassword} videoId={videoId} />
       {!data.needsPassword && (
         <AuthorizedContent video={data.video} searchParams={searchParams} />
@@ -823,19 +845,17 @@ return Effect.gen(function* () {
   Effect.catchTags({
     PolicyDenied: () =>
       Effect.succeed(
-        <div className="flex flex-col justify-center items-center p-4 min-h-screen text-center">
-          <Logo className="size-32" />
-          <h1 className="mb-2 text-2xl font-semibold">
-            This video is private
-          </h1>
-          <p className="text-gray-400">
-            If you own this video, please <Link href="/login">sign in</Link>{" "}
-            to manage sharing.
+        <div className='flex flex-col justify-center items-center p-4 min-h-screen text-center'>
+          <Logo className='size-32' />
+          <h1 className='mb-2 text-2xl font-semibold'>This video is private</h1>
+          <p className='text-gray-400'>
+            If you own this video, please <Link href='/login'>sign in</Link> to
+            manage sharing.
           </p>
         </div>,
       ),
     NoSuchElementException: () => {
-      console.log("[ShareVideoPage] No video found for videoId:", videoId)
+      console.log('[ShareVideoPage] No video found for videoId:', videoId)
       return Effect.succeed(<p>No video found</p>)
     },
   }),
@@ -843,6 +863,7 @@ return Effect.gen(function* () {
 ```
 
 **Problems:**
+
 - `Effect.gen` + `yield*` to do what `async/await` already does
 - `Option.fromNullable` + `Effect.flatten` to turn `null` into `NoSuchElementException` — a roundabout way to check `if (!video)`
 - `Effect.catchTag("VerifyVideoPasswordError")` mid-pipe transforms one error into a different data shape, then `Effect.map` renders JSX — two separate pipe stages for one concept
@@ -872,14 +893,12 @@ const videoResult = await fetchVideoWithPolicy(videoId)
 // PolicyDenied → private video page
 if (videoResult instanceof PolicyDeniedError) {
   return (
-    <div className="flex flex-col justify-center items-center p-4 min-h-screen text-center">
-      <Logo className="size-32" />
-      <h1 className="mb-2 text-2xl font-semibold">
-        This video is private
-      </h1>
-      <p className="text-gray-400">
-        If you own this video, please <Link href="/login">sign in</Link>{" "}
-        to manage sharing.
+    <div className='flex flex-col justify-center items-center p-4 min-h-screen text-center'>
+      <Logo className='size-32' />
+      <h1 className='mb-2 text-2xl font-semibold'>This video is private</h1>
+      <p className='text-gray-400'>
+        If you own this video, please <Link href='/login'>sign in</Link> to
+        manage sharing.
       </p>
     </div>
   )
@@ -888,7 +907,7 @@ if (videoResult instanceof PolicyDeniedError) {
 // Password required → show overlay only
 if (videoResult instanceof VerifyVideoPasswordError) {
   return (
-    <div className="min-h-screen flex flex-col bg-[#F7F8FA]">
+    <div className='min-h-screen flex flex-col bg-[#F7F8FA]'>
       <PasswordOverlay isOpen={true} videoId={videoId} />
     </div>
   )
@@ -901,13 +920,13 @@ const [video] = videoResult
 
 // No video found
 if (!video) {
-  console.log("[ShareVideoPage] No video found for videoId:", videoId)
+  console.log('[ShareVideoPage] No video found for videoId:', videoId)
   return <p>No video found</p>
 }
 
 // Success
 return (
-  <div className="min-h-screen flex flex-col bg-[#F7F8FA]">
+  <div className='min-h-screen flex flex-col bg-[#F7F8FA]'>
     <PasswordOverlay isOpen={false} videoId={videoId} />
     <AuthorizedContent video={video} searchParams={searchParams} />
   </div>
@@ -915,6 +934,7 @@ return (
 ```
 
 **What changed:**
+
 - No generators, no `yield*`, no `Option.fromNullable`, no `Effect.flatten` — just `await` and `if`
 - Each error is handled right where you'd expect: `instanceof` check → early return with JSX
 - Null check is `if (!video)` instead of `Option.fromNullable` + `Effect.flatten` + `NoSuchElementException`
