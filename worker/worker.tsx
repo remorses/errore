@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { renderComparisonPage } from './comparison-page'
 import comparisonMd from './errore-vs-effect.md'
-import { css, baseReset } from './shared-styles'
+import { css, baseReset, hideScrollbars } from './shared-styles'
 
 const app = new Hono()
 
@@ -53,16 +53,7 @@ const styles = css`
     -moz-osx-font-smoothing: grayscale;
   }
 
-  * {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  *::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-    display: none;
-  }
+  ${hideScrollbars}
 
   main {
     display: grid;

@@ -5,7 +5,7 @@
 
 import { marked } from 'marked'
 import { highlightCode } from './highlight'
-import { darkModeColors } from './shared-styles'
+import { darkModeColors, hideScrollbars } from './shared-styles'
 
 interface Section {
   prose: string
@@ -175,16 +175,7 @@ function getStyles(): string {
       -webkit-font-smoothing: antialiased;
     }
 
-    * {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-
-    *::-webkit-scrollbar {
-      width: 0;
-      height: 0;
-      display: none;
-    }
+    ${hideScrollbars}
 
     /* Header */
     .page-header {

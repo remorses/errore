@@ -20,6 +20,20 @@ export const baseReset = `
   }
 `
 
+/** Shared scrollbar hiding rules used across pages. */
+export const hideScrollbars = `
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+`
+
 /** Shared font stacks. */
 export const fonts = {
   serif: `'Source Serif 4', Georgia, serif`,
