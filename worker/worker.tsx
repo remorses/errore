@@ -53,6 +53,17 @@ const styles = css`
     -moz-osx-font-smoothing: grayscale;
   }
 
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
   main {
     display: grid;
     grid-template-columns: 1fr min(72ch, calc(100% - 48px)) 1fr;

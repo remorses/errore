@@ -10,14 +10,14 @@ How each approach defines typed error classes.
 import { Data } from 'effect'
 
 // !focus(1:3)
-class NotFoundError extends Data.TaggedError('NotFoundError')<{
-  readonly id: string
-}> {}
+class NotFoundError extends Data.TaggedError(
+  'NotFoundError'
+)<{ readonly id: string }> {}
 
 // !focus(1:3)
-class NetworkError extends Data.TaggedError('NetworkError')<{
-  readonly url: string
-}> {}
+class NetworkError extends Data.TaggedError(
+  'NetworkError'
+)<{ readonly url: string }> {}
 ```
 
 ```typescript
@@ -45,35 +45,41 @@ Effect tracks three type parameters for every operation. errore uses a plain uni
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:11)
+// !focus(1:17)
 //         ┌── success
 //         │      ┌── error
 //         │      │         ┌── dependencies
 //         ▼      ▼         ▼
 // Effect< User,  HttpError, Database >
-type GetUser = Effect.Effect<User, NotFoundError | NetworkError, Database>
+type GetUser = Effect.Effect<
+  User,
+  NotFoundError | NetworkError,
+  Database
+>
 
 // Every function returns this 3-param type
 function getUser(
-  id: string,
-): Effect.Effect<User, NotFoundError | NetworkError, Database>
+  id: string
+): Effect.Effect<
+  User, NotFoundError | NetworkError, Database
+>
 ```
 
 ```typescript
-// !focus(1:3)
-// Just a union: Error | Value
-// No extra type parameters
-function getUser(id: string): Promise<NotFoundError | NetworkError | User>
+// !focus(1:7)
+//                      ┌── typed errors      ┌── optional absence   ┌── success
+//                      ▼                     ▼                       ▼
+// Promise<NotFoundError | NetworkError | null | User>
+function getUser(
+  id: string
+): Promise<NotFoundError | NetworkError | null | User>
 
-// !focus(1:9)
-// The return type tells the full story
+// !focus(1:6)
+// Handle errors and optionals with normal checks
 const user = await getUser(id)
-if (user instanceof NotFoundError) {
-  /* ... */
-}
-if (user instanceof NetworkError) {
-  /* ... */
-}
+if (user instanceof NotFoundError) { /* ... */ }
+if (user instanceof NetworkError) { /* ... */ }
+if (user === null) { /* no user yet */ }
 console.log(user.name) // User
 ```
 
@@ -123,7 +129,7 @@ Fetching a user and handling a potential error.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:6)
+// !focus(1:7)
 function getUser(id: string) {
   return Effect.gen(function* () {
     const user = yield* fetchUser(id)
@@ -131,17 +137,21 @@ function getUser(id: string) {
   })
 }
 
-// !focus(1:5)
+// !focus(1:7)
 const result = Effect.runSync(
   getUser('123').pipe(
-    Effect.catchTag('NotFoundError', (e) => Effect.succeed(null)),
-  ),
+    Effect.catchTag('NotFoundError', (e) =>
+      Effect.succeed(null)
+    )
+  )
 )
 ```
 
 ```typescript
-// !focus(1:5)
-function getUser(id: string): NotFoundError | User {
+// !focus(1:7)
+function getUser(
+  id: string
+): NotFoundError | User {
   const user = fetchUser(id)
   if (user instanceof NotFoundError) return user
   return user
@@ -168,21 +178,27 @@ Selectively recovering from specific error types while letting others propagate.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:17)
+// !focus(1:23)
 // catchTag — handle one specific error
 const program = fetchUser(id).pipe(
   Effect.catchTag('NotFoundError', (e) =>
-    Effect.succeed({ name: 'guest', id: e.id }),
-  ),
+    Effect.succeed(
+      { name: 'guest', id: e.id }
+    )
+  )
 )
 // NetworkError still propagates
 
 // catchTags — handle multiple error types
 const handled = fetchUser(id).pipe(
   Effect.catchTags({
-    NotFoundError: (e) => Effect.succeed({ name: 'guest', id: e.id }),
-    NetworkError: (e) => Effect.succeed({ name: 'offline', id: 'unknown' }),
-  }),
+    NotFoundError: (e) =>
+      Effect.succeed({ name: 'guest', id: e.id }),
+    NetworkError: (e) =>
+      Effect.succeed(
+        { name: 'offline', id: 'unknown' }
+      )
+  })
 )
 
 await Effect.runPromise(handled)
@@ -208,15 +224,19 @@ Exhaustive handling of all error cases.
 ```typescript
 import { Effect, Match } from 'effect'
 
-// !focus(1:9)
+// !focus(1:14)
 const program = fetchUser(id).pipe(
   Effect.catchAll((error) =>
     Match.value(error).pipe(
-      Match.tag('NotFoundError', (e) => Effect.succeed(`User ${e.id} missing`)),
-      Match.tag('NetworkError', (e) => Effect.succeed(`Failed: ${e.url}`)),
-      Match.exhaustive,
-    ),
-  ),
+      Match.tag('NotFoundError', (e) =>
+        Effect.succeed(`User ${e.id} missing`)
+      ),
+      Match.tag('NetworkError', (e) =>
+        Effect.succeed(`Failed: ${e.url}`)
+      ),
+      Match.exhaustive
+    )
+  )
 )
 ```
 
@@ -228,9 +248,9 @@ const user = await fetchUser(id)
 
 if (user instanceof Error) {
   const message = errore.matchError(user, {
-    NotFoundError: (e) => `User ${e.id} missing`,
-    NetworkError: (e) => `Failed: ${e.url}`,
-    Error: (e) => `Unexpected: ${e.message}`,
+    NotFoundError: e => `User ${e.id} missing`,
+    NetworkError: e => `Failed: ${e.url}`,
+    Error: e => `Unexpected: ${e.message}`,
   })
   console.log(message)
 }
@@ -245,19 +265,17 @@ When an error occurs in a chain of operations, all subsequent steps are skipped.
 ```typescript
 import { Effect, Console } from 'effect'
 
-// !focus(1:17)
+// !focus(1:15)
 const task1 = Console.log('step 1...')
-const task2 = Effect.fail(
-  new NetworkError({
-    url: '/api',
-  }),
-)
+const task2 = Effect.fail(new NetworkError({
+  url: '/api'
+}))
 const task3 = Console.log('step 3...')
 
 const program = Effect.gen(function* () {
-  yield* task1 // runs
-  yield* task2 // fails — short circuits
-  yield* task3 // never reached
+  yield* task1     // runs
+  yield* task2     // fails — short circuits
+  yield* task3     // never reached
 })
 
 // Output: "step 1..."
@@ -286,22 +304,28 @@ How errors flow through the call stack.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:10)
-function getUser(
-  id: string,
-): Effect.Effect<User, NotFoundError | NetworkError, never>
+// !focus(1:14)
+function getUser(id: string): Effect.Effect<
+  User,
+  NotFoundError | NetworkError,
+  never
+>
 
 const program = getUser('123').pipe(
-  Effect.flatMap((user) => getPosts(user.id)),
+  Effect.flatMap((user) =>
+    getPosts(user.id)
+  ),
   // Errors from both getUser and getPosts
   // accumulate in the channel type
-  Effect.catchAll(handleError),
+  Effect.catchAll(handleError)
 )
 ```
 
 ```typescript
-// !focus(1:8)
-function getUser(id: string): NotFoundError | NetworkError | User
+// !focus(1:10)
+function getUser(
+  id: string
+): NotFoundError | NetworkError | User
 
 const user = getUser('123')
 if (user instanceof Error) return user
@@ -320,16 +344,16 @@ Trying multiple strategies in sequence, falling back on failure.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:12)
+// !focus(1:10)
 const program = fetchFromCache(id).pipe(
   Effect.orElse(() => fetchFromDb(id)),
   Effect.orElse(() => fetchFromApi(id)),
   Effect.catchAll(() =>
     Effect.succeed({
       name: 'Unknown',
-      id,
-    }),
-  ),
+      id
+    })
+  )
 )
 
 await Effect.runPromise(program)
@@ -359,32 +383,42 @@ Collecting all errors instead of short-circuiting on the first failure.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:13)
-const program = Effect.forEach(userIds, (id) => fetchUser(id), {
-  concurrency: 'unbounded',
-}).pipe(
+// !focus(1:20)
+const program = Effect.forEach(
+  userIds,
+  (id) => fetchUser(id),
+  { concurrency: 'unbounded' }
+).pipe(
   Effect.validate,
-  Effect.catchAll(([errors]) => Effect.succeed({ errors, users: [] })),
+  Effect.catchAll(([errors]) =>
+    Effect.succeed({ errors, users: [] })
+  )
 )
 
 // Or partition with Effect.partition
 const [errors, users] = await Effect.runPromise(
-  Effect.partition(userIds, (id) => fetchUser(id), {
-    concurrency: 'unbounded',
-  }),
+  Effect.partition(
+    userIds,
+    (id) => fetchUser(id),
+    { concurrency: 'unbounded' }
+  )
 )
 ```
 
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:6)
-const results = await Promise.all(userIds.map((id) => fetchUser(id)))
+// !focus(1:10)
+const results = await Promise.all(
+  userIds.map((id) => fetchUser(id))
+)
 
 const [users, errors] = errore.partition(results)
 // users: User[], errors: Error[]
 
-errors.forEach((e) => console.warn('Failed:', e.message))
+errors.forEach((e) =>
+  console.warn('Failed:', e.message)
+)
 ```
 
 ---
@@ -400,11 +434,13 @@ Handling async operations that can fail.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:12)
+// !focus(1:14)
 const getUser = (id: string) =>
   Effect.tryPromise({
-    try: () => fetch(`/api/users/${id}`).then((r) => r.json()),
-    catch: () => new NetworkError({ url: `/api/users/${id}` }),
+    try: () => fetch(`/api/users/${id}`)
+      .then(r => r.json()),
+    catch: () =>
+      new NetworkError({ url: `/api/users/${id}` })
   })
 
 const program = Effect.gen(function* () {
@@ -418,24 +454,20 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:23)
-async function getUser(id: string): Promise<NetworkError | User> {
-  const res = await fetch(`/api/users/${id}`).catch(
-    (e) =>
-      new NetworkError({
-        url: `/api/users/${id}`,
-        cause: e,
-      }),
-  )
+// !focus(1:14)
+async function getUser(
+  id: string
+): Promise<NetworkError | User> {
+  const res = await fetch(`/api/users/${id}`)
+    .catch((e) => new NetworkError({
+      url: `/api/users/${id}`, cause: e
+    }))
   if (res instanceof Error) return res
 
-  const data = await (res.json() as Promise<User>).catch(
-    (e) =>
-      new NetworkError({
-        url: `/api/users/${id}`,
-        cause: e,
-      }),
-  )
+  const data = await (res.json() as Promise<User>)
+    .catch((e) => new NetworkError({
+      url: `/api/users/${id}`, cause: e
+    }))
   return data
 }
 
@@ -453,14 +485,19 @@ Retrying a failing operation with exponential backoff and a maximum number of at
 ```typescript
 import { Effect, Schedule } from 'effect'
 
-// !focus(1:11)
+// !focus(1:16)
 const policy = Schedule.exponential('100 millis').pipe(
   Schedule.compose(Schedule.recurs(3)),
-  Schedule.union(Schedule.spaced('5 seconds')),
+  Schedule.union(
+    Schedule.spaced('5 seconds')
+  )
 )
 
 const program = Effect.gen(function* () {
-  const user = yield* Effect.retry(fetchUser(id), policy)
+  const user = yield* Effect.retry(
+    fetchUser(id),
+    policy
+  )
   return user
 })
 
@@ -468,8 +505,10 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-// !focus(1:12)
-async function fetchWithRetry(id: string): Promise<NetworkError | User> {
+// !focus(1:13)
+async function fetchWithRetry(
+  id: string
+): Promise<NetworkError | User> {
   for (let i = 0; i < 3; i++) {
     const user = await fetchUser(id)
     if (!(user instanceof Error)) return user
@@ -492,26 +531,33 @@ Retrying until a specific error condition is met, with different handling for th
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:13)
-const program = Effect.retry(fetchUser(id), {
-  times: 5,
-  until: (err) => err._tag === 'NotFoundError',
-})
+// !focus(1:20)
+const program = Effect.retry(
+  fetchUser(id),
+  {
+    times: 5,
+    until: (err) =>
+      err._tag === 'NotFoundError'
+  }
+)
 
 // Or with retryOrElse for a fallback
 const withFallback = Effect.retryOrElse(
   fetchUser(id),
   Schedule.recurs(3),
-  (error, _) => Effect.succeed({ name: 'guest', id: 'unknown' }),
+  (error, _) =>
+    Effect.succeed(
+      { name: 'guest', id: 'unknown' }
+    )
 )
 
 await Effect.runPromise(withFallback)
 ```
 
 ```typescript
-// !focus(1:15)
+// !focus(1:17)
 async function fetchWithRetry(
-  id: string,
+  id: string
 ): Promise<NotFoundError | NetworkError | User> {
   for (let i = 0; i < 5; i++) {
     const user = await fetchUser(id)
@@ -524,7 +570,9 @@ async function fetchWithRetry(
 
 // Or with a fallback on exhaustion
 const user = await fetchWithRetry(id)
-const result = user instanceof Error ? { name: 'guest', id: 'unknown' } : user
+const result = user instanceof Error
+  ? { name: 'guest', id: 'unknown' }
+  : user
 ```
 
 ---
@@ -536,41 +584,44 @@ Aborting an operation if it takes too long and returning a typed error.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:15)
+// !focus(1:20)
 const program = fetchUser(id).pipe(
   Effect.timeoutFail({
     duration: '5 seconds',
-    onTimeout: () =>
-      new TimeoutError({
-        operation: 'fetchUser',
-        duration: '5s',
-      }),
-  }),
+    onTimeout: () => new TimeoutError({
+      operation: 'fetchUser',
+      duration: '5s'
+    })
+  })
 )
 
 // The error channel now includes TimeoutError
 const result = await Effect.runPromise(
-  program.pipe(Effect.catchTag('TimeoutError', (e) => Effect.succeed(null))),
+  program.pipe(
+    Effect.catchTag('TimeoutError', (e) =>
+      Effect.succeed(null)
+    )
+  )
 )
 ```
 
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:18)
-async function fetchWithTimeout(id: string): Promise<NetworkError | User> {
+// !focus(1:17)
+async function fetchWithTimeout(
+  id: string
+): Promise<NetworkError | User> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 5000)
+  const timer = setTimeout(
+    () => controller.abort(), 5000
+  )
 
   const user = await fetchUser(id, {
-    signal: controller.signal,
-  }).catch(
-    (e) =>
-      new NetworkError({
-        url: `/users/${id}`,
-        cause: e,
-      }),
-  )
+    signal: controller.signal
+  }).catch((e) => new NetworkError({
+    url: `/users/${id}`, cause: e
+  }))
   clearTimeout(timer)
 
   if (user instanceof Error) return user
@@ -587,10 +638,12 @@ Running multiple operations concurrently and handling individual failures.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:6)
-const program = Effect.all([fetchUser(id), fetchPosts(id), fetchStats(id)], {
-  concurrency: 'unbounded',
-})
+// !focus(1:8)
+const program = Effect.all([
+  fetchUser(id),
+  fetchPosts(id),
+  fetchStats(id),
+], { concurrency: 'unbounded' })
 
 // All succeed or the first error propagates
 await Effect.runPromise(program)
@@ -625,7 +678,7 @@ Cancelling a running operation from the outside using fibers.
 ```typescript
 import { Effect, Fiber } from 'effect'
 
-// !focus(1:15)
+// !focus(1:19)
 const program = Effect.gen(function* () {
   // Fork a long-running task into a fiber
   const fiber = yield* Effect.fork(longRunningTask)
@@ -638,13 +691,16 @@ const program = Effect.gen(function* () {
 })
 
 // Or race two effects — loser gets interrupted
-const fastest = Effect.race(fetchFromPrimary(id), fetchFromReplica(id))
+const fastest = Effect.race(
+  fetchFromPrimary(id),
+  fetchFromReplica(id)
+)
 
 await Effect.runPromise(fastest)
 ```
 
 ```typescript
-// !focus(1:13)
+// !focus(1:15)
 // AbortController replaces fibers
 const controller = new AbortController()
 const task = longRunningTask(controller.signal)
@@ -656,7 +712,10 @@ await doSomethingElse()
 controller.abort()
 
 // Or race two operations — first wins
-const fastest = await Promise.race([fetchFromPrimary(id), fetchFromReplica(id)])
+const fastest = await Promise.race([
+  fetchFromPrimary(id),
+  fetchFromReplica(id),
+])
 if (fastest instanceof Error) return fastest
 ```
 
@@ -669,18 +728,17 @@ Guaranteeing resource cleanup even when an operation is cancelled or interrupted
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:23)
+// !focus(1:22)
 const withConnection = Effect.acquireRelease(
   Effect.sync(() => {
     const conn = createConnection()
     console.log('opened')
     return conn
   }),
-  (conn) =>
-    Effect.sync(() => {
-      conn.close()
-      console.log('closed')
-    }),
+  (conn) => Effect.sync(() => {
+    conn.close()
+    console.log('closed')
+  })
 )
 
 const program = Effect.scoped(
@@ -688,7 +746,7 @@ const program = Effect.scoped(
     const conn = yield* withConnection
     const data = yield* query(conn, sql)
     return data
-  }),
+  })
 )
 
 // If interrupted, the connection is still closed
@@ -698,8 +756,10 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:13)
-async function queryDb(sql: string): Promise<DbError | Row[]> {
+// !focus(1:18)
+async function queryDb(
+  sql: string
+): Promise<DbError | Row[]> {
   await using cleanup = new errore.AsyncDisposableStack()
 
   const conn = createConnection()
@@ -710,7 +770,8 @@ async function queryDb(sql: string): Promise<DbError | Row[]> {
   })
 
   // If anything fails, connection is still closed
-  return query(conn, sql).catch((e) => new DbError({ cause: e }))
+  return query(conn, sql)
+    .catch((e) => new DbError({ cause: e }))
 }
 
 // !focus(1:2)
@@ -727,19 +788,27 @@ Guaranteeing a cleanup step runs regardless of success, failure, or interruption
 ```typescript
 import { Effect, Console } from 'effect'
 
-// !focus(1:14)
+// !focus(1:24)
 // ensuring: cleanup runs on success, failure,
 // and interruption
 const program = Effect.gen(function* () {
   const data = yield* fetchData()
   return data
-}).pipe(Effect.ensuring(Console.log('Cleanup completed')))
+}).pipe(
+  Effect.ensuring(
+    Console.log('Cleanup completed')
+  )
+)
 
 // onExit: cleanup receives the Exit value
 const withExit = Effect.gen(function* () {
   const data = yield* fetchData()
   return data
-}).pipe(Effect.onExit((exit) => Console.log(`Exit: ${exit._tag}`)))
+}).pipe(
+  Effect.onExit((exit) =>
+    Console.log(`Exit: ${exit._tag}`)
+  )
+)
 
 await Effect.runPromise(program)
 ```
@@ -747,14 +816,18 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:10)
+// !focus(1:15)
 // await using = cleanup runs on every exit path
 async function getData(): Promise<FetchError | Data> {
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup =
+    new errore.AsyncDisposableStack()
 
-  cleanup.defer(() => console.log('Cleanup completed'))
+  cleanup.defer(() =>
+    console.log('Cleanup completed')
+  )
 
-  const data = await fetchData().catch((e) => new FetchError({ cause: e }))
+  const data = await fetchData()
+    .catch((e) => new FetchError({ cause: e }))
   return data
   // cleanup runs automatically
 }
@@ -769,9 +842,13 @@ Registering cleanup actions within a scope that execute when the scope closes �
 ```typescript
 import { Effect, Console } from 'effect'
 
-// !focus(1:11)
+// !focus(1:15)
 const program = Effect.gen(function* () {
-  yield* Effect.addFinalizer((exit) => Console.log(`Finalizer: ${exit._tag}`))
+  yield* Effect.addFinalizer((exit) =>
+    Console.log(
+      `Finalizer: ${exit._tag}`
+    )
+  )
   const data = yield* fetchData()
   return data
 })
@@ -786,13 +863,17 @@ await Effect.runPromise(runnable)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:9)
+// !focus(1:14)
 async function getData(): Promise<FetchError | Data> {
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup =
+    new errore.AsyncDisposableStack()
 
-  cleanup.defer(() => console.log('Finalizer: done'))
+  cleanup.defer(() =>
+    console.log('Finalizer: done')
+  )
 
-  const data = await fetchData().catch((e) => new FetchError({ cause: e }))
+  const data = await fetchData()
+    .catch((e) => new FetchError({ cause: e }))
   return data
   // "Finalizer: done" runs on every exit path
 }
@@ -807,14 +888,14 @@ Managing multiple resources where cleanup order matters — each resource must b
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:23)
+// !focus(1:26)
 const withDb = Effect.acquireRelease(
   Effect.promise(() => connectDb()),
-  (db) => Effect.promise(() => db.close()),
+  (db) => Effect.promise(() => db.close())
 )
 const withCache = Effect.acquireRelease(
   Effect.promise(() => openCache()),
-  (cache) => Effect.promise(() => cache.flush()),
+  (cache) => Effect.promise(() => cache.flush())
 )
 
 const program = Effect.scoped(
@@ -823,11 +904,13 @@ const program = Effect.scoped(
     const cache = yield* withCache
     const order = yield* Effect.tryPromise({
       try: () => db.query(orderId),
-      catch: () => new DbError({ orderId }),
+      catch: () => new DbError({ orderId })
     })
-    yield* Effect.promise(() => cache.set(orderId, order))
+    yield* Effect.promise(
+      () => cache.set(orderId, order)
+    )
     return order
-  }),
+  })
 )
 
 await Effect.runPromise(program)
@@ -836,24 +919,25 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:24)
+// !focus(1:25)
 async function processOrder(
-  orderId: string,
+  orderId: string
 ): Promise<DbError | CacheError | Order> {
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup =
+    new errore.AsyncDisposableStack()
 
-  const db = await connectDb().catch((e) => new DbError({ orderId, cause: e }))
+  const db = await connectDb()
+    .catch((e) => new DbError({ orderId, cause: e }))
   if (db instanceof Error) return db
   cleanup.defer(() => db.close())
 
-  const cache = await openCache().catch(
-    (e) => new CacheError({ orderId, cause: e }),
-  )
+  const cache = await openCache()
+    .catch((e) =>
+      new CacheError({ orderId, cause: e }))
   if (cache instanceof Error) return cache
   cleanup.defer(() => cache.flush())
 
-  const order = await db
-    .query(orderId)
+  const order = await db.query(orderId)
     .catch((e) => new DbError({ orderId, cause: e }))
   if (order instanceof Error) return order
 
@@ -872,21 +956,24 @@ Aborting an operation after a deadline while ensuring resources are released.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:17)
+// !focus(1:20)
 const program = Effect.scoped(
   Effect.gen(function* () {
     const conn = yield* acquireConnection
-    yield* Effect.addFinalizer(() => Effect.promise(() => conn.close()))
-    return yield* Effect.tryPromise(() => conn.query(sql))
-  }),
+    yield* Effect.addFinalizer(() =>
+      Effect.promise(() => conn.close())
+    )
+    return yield* Effect.tryPromise(
+      () => conn.query(sql)
+    )
+  })
 ).pipe(
   Effect.timeoutFail({
     duration: '5 seconds',
-    onTimeout: () =>
-      new TimeoutError({
-        operation: 'query',
-      }),
-  }),
+    onTimeout: () => new TimeoutError({
+      operation: 'query'
+    })
+  })
 )
 
 await Effect.runPromise(program)
@@ -895,22 +982,28 @@ await Effect.runPromise(program)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:18)
-async function queryWithTimeout(sql: string): Promise<DbError | Row[]> {
-  await using cleanup = new errore.AsyncDisposableStack()
+// !focus(1:23)
+async function queryWithTimeout(
+  sql: string
+): Promise<DbError | Row[]> {
+  await using cleanup =
+    new errore.AsyncDisposableStack()
 
   // AbortController for cancellation
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 5000)
+  const timer = setTimeout(
+    () => controller.abort(), 5000
+  )
   cleanup.defer(() => clearTimeout(timer))
 
   const conn = await connect({
-    signal: controller.signal,
+    signal: controller.signal
   }).catch((e) => new DbError({ cause: e }))
   if (conn instanceof Error) return conn
   cleanup.defer(() => conn.close())
 
-  return conn.query(sql).catch((e) => new DbError({ cause: e }))
+  return conn.query(sql)
+    .catch((e) => new DbError({ cause: e }))
   // caller uses errore.isAbortError() to detect timeout
   // cleanup: conn.close() → clearTimeout()
 }
@@ -929,7 +1022,7 @@ Chaining multiple fallible operations together.
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:13)
+// !focus(1:18)
 const program = Effect.gen(function* () {
   const user = yield* fetchUser(id)
   const posts = yield* fetchPosts(user.id)
@@ -939,9 +1032,13 @@ const program = Effect.gen(function* () {
 
 const result = await Effect.runPromise(
   program.pipe(
-    Effect.catchTag('NotFoundError', () => Effect.succeed([])),
-    Effect.catchTag('NetworkError', () => Effect.succeed([])),
-  ),
+    Effect.catchTag('NotFoundError', () =>
+      Effect.succeed([])
+    ),
+    Effect.catchTag('NetworkError', () =>
+      Effect.succeed([])
+    )
+  )
 )
 ```
 
@@ -969,7 +1066,7 @@ Effect requires Context.Tag, Layer, and provideService to manage dependencies. e
 ```typescript
 import { Effect, Context, Layer } from 'effect'
 
-// !focus(1:19)
+// !focus(1:28)
 class Database extends Context.Tag('Database')<
   Database,
   { query: (sql: string) => Effect.Effect<Row[]> }
@@ -982,11 +1079,20 @@ const program = Effect.gen(function* () {
 })
 
 // Must provide the service before running
-const DatabaseLive = Layer.succeed(Database, {
-  query: (sql) => Effect.tryPromise(() => pg.query(sql).then((r) => r.rows)),
-})
+const DatabaseLive = Layer.succeed(
+  Database,
+  {
+    query: (sql) =>
+      Effect.tryPromise(() =>
+        pg.query(sql).then(r => r.rows)
+      )
+  }
+)
 
-const runnable = Effect.provide(program, DatabaseLive)
+const runnable = Effect.provide(
+  program,
+  DatabaseLive
+)
 
 await Effect.runPromise(runnable)
 ```
@@ -994,12 +1100,13 @@ await Effect.runPromise(runnable)
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:6)
+// !focus(1:8)
 // Just pass the dependency as a parameter
-async function getUsers(db: {
-  query: (sql: string) => Promise<Row[]>
-}): Promise<DbError | Row[]> {
-  return db.query('SELECT * FROM users').catch((e) => new DbError({ cause: e }))
+async function getUsers(
+  db: { query: (sql: string) => Promise<Row[]> }
+): Promise<DbError | Row[]> {
+  return db.query('SELECT * FROM users')
+    .catch((e) => new DbError({ cause: e }))
 }
 
 // !focus(1:4)
@@ -1022,10 +1129,9 @@ import { Effect } from 'effect'
 const parseConfig = (input: string) =>
   Effect.try({
     try: () => JSON.parse(input),
-    catch: (e) =>
-      new ParseError({
-        reason: String(e),
-      }),
+    catch: (e) => new ParseError({
+      reason: String(e)
+    })
   })
 
 const program = Effect.gen(function* () {
@@ -1037,14 +1143,15 @@ const program = Effect.gen(function* () {
 ```typescript
 import * as errore from 'errore'
 
-// !focus(1:13)
-function parseConfig(input: string): ParseError | Config {
+// !focus(1:14)
+function parseConfig(
+  input: string
+): ParseError | Config {
   return errore.try({
     try: () => JSON.parse(input) as Config,
-    catch: (e) =>
-      new ParseError({
-        reason: e.message,
-      }),
+    catch: (e) => new ParseError({
+      reason: e.message
+    })
   })
 }
 
@@ -1062,8 +1169,10 @@ Which approach is better for public APIs? Effect requires callers to install and
 ```typescript
 import { Effect } from 'effect'
 
-// !focus(1:8)
-export function parse(input: string): Effect.Effect<AST, ParseError> {
+// !focus(1:11)
+export function parse(
+  input: string
+): Effect.Effect<AST, ParseError> {
   // ...
 }
 
@@ -1074,8 +1183,10 @@ export function parse(input: string): Effect.Effect<AST, ParseError> {
 ```
 
 ```typescript
-// !focus(1:8)
-export function parse(input: string): AST | ParseError {
+// !focus(1:11)
+export function parse(
+  input: string
+): AST | ParseError {
   // ...
 }
 

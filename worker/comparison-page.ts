@@ -175,6 +175,17 @@ function getStyles(): string {
       -webkit-font-smoothing: antialiased;
     }
 
+    * {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    *::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      display: none;
+    }
+
     /* Header */
     .page-header {
       max-width: 1000px;
