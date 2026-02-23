@@ -626,6 +626,455 @@ async function legacyHandler(id: string) {
 - [ ] Use `matchError` at top-level handlers for exhaustive handling (always include `Error` handler)
 - [ ] Use `| null` for optional values instead of `| undefined`
 
+## Flat Control Flow Patterns
+
+### Avoid else
+
+```ts
+// before
+function getLabel(user: User): string {
+  if (user.isAdmin) {
+    return 'Admin'
+  } else {
+    return 'Member'
+  }
+}
+
+// after
+function getLabel(user: User): string {
+  if (user.isAdmin) return 'Admin'
+  return 'Member'
+}
+```
+
+### Flatten else-if chains
+
+```ts
+// before
+function getStatus(code: number): string {
+  if (code === 200) {
+    return 'ok'
+  } else if (code === 404) {
+    return 'not found'
+  } else if (code >= 500) {
+    return 'server error'
+  } else {
+    return 'unknown'
+  }
+}
+
+// after
+function getStatus(code: number): string {
+  if (code === 200) return 'ok'
+  if (code === 404) return 'not found'
+  if (code >= 500) return 'server error'
+  return 'unknown'
+}
+```
+
+### Flatten nested ifs
+
+```ts
+// before — 3 levels deep
+function processOrder(order: Order): ProcessError | Receipt {
+  if (order.items.length > 0) {
+    if (order.payment) {
+      if (order.payment.verified) {
+        return createReceipt(order)
+      } else {
+        return new ProcessError({ reason: 'Payment not verified' })
+      }
+    } else {
+      return new ProcessError({ reason: 'No payment method' })
+    }
+  } else {
+    return new ProcessError({ reason: 'Empty cart' })
+  }
+}
+
+// after — flat, every check at root level
+function processOrder(order: Order): ProcessError | Receipt {
+  if (order.items.length === 0) {
+    return new ProcessError({ reason: 'Empty cart' })
+  }
+  if (!order.payment) {
+    return new ProcessError({ reason: 'No payment method' })
+  }
+  if (!order.payment.verified) {
+    return new ProcessError({ reason: 'Payment not verified' })
+  }
+  return createReceipt(order)
+}
+```
+
+### Avoid try-catch nesting
+
+```ts
+// before
+async function loadConfig(): Promise<Config> {
+  try {
+    const raw = await fs.readFile('config.json', 'utf-8')
+    try {
+      const parsed = JSON.parse(raw)
+      if (!parsed.port) {
+        throw new Error('Missing port')
+      }
+      return parsed
+    } catch (e) {
+      throw new Error(`Invalid JSON: ${e}`)
+    }
+  } catch (e) {
+    return { port: 3000 }
+  }
+}
+
+// after
+async function loadConfig(): Promise<Config> {
+  const raw = await fs
+    .readFile('config.json', 'utf-8')
+    .catch((e) => new ConfigError({ reason: 'Read failed', cause: e }))
+  if (raw instanceof Error) return { port: 3000 }
+
+  const parsed = errore.try({
+    try: () => JSON.parse(raw) as Config,
+    catch: (e) => new ConfigError({ reason: 'Invalid JSON', cause: e }),
+  })
+  if (parsed instanceof Error) return { port: 3000 }
+
+  if (!parsed.port) return { port: 3000 }
+
+  return parsed
+}
+```
+
+### Don't invert the pattern
+
+```ts
+// before — success logic buried inside if blocks, happy path is nested
+const user = await getUser(id)
+if (!(user instanceof Error)) {
+  const posts = await getPosts(user.id)
+  if (!(posts instanceof Error)) {
+    return render(user, posts)
+  }
+  return posts // error
+}
+return user // error
+
+// after — errors in branches, happy path at root
+const user = await getUser(id)
+if (user instanceof Error) return user
+
+const posts = await getPosts(user.id)
+if (posts instanceof Error) return posts
+
+return render(user, posts)
+```
+
+Same in loops:
+
+```ts
+// before — success logic nested inside if
+for (const id of ids) {
+  const item = await fetchItem(id)
+  if (!(item instanceof Error)) {
+    await processItem(item)
+    results.push(item)
+  }
+}
+
+// after — error in branch, continue
+for (const id of ids) {
+  const item = await fetchItem(id)
+  if (item instanceof Error) {
+    console.warn('Skipping', id, item.message)
+    continue
+  }
+  await processItem(item)
+  results.push(item)
+}
+```
+
+### Expressions over statements (let + branches)
+
+```ts
+// before — mutable variable, assigned across branches
+let config
+const envResult = loadFromEnv()
+if (!(envResult instanceof Error)) {
+  config = envResult
+} else {
+  const fileResult = loadFromFile()
+  if (!(fileResult instanceof Error)) {
+    config = fileResult
+  } else {
+    config = defaultConfig
+  }
+}
+
+// after — IIFE with early returns, single immutable binding
+const config: Config = (() => {
+  const envResult = loadFromEnv()
+  if (!(envResult instanceof Error)) return envResult
+  const fileResult = loadFromFile()
+  if (!(fileResult instanceof Error)) return fileResult
+  return defaultConfig
+})()
+```
+
+## Additional Patterns
+
+### Custom Base Classes
+
+```ts
+// before
+class AppError extends Error {
+  statusCode = 500
+  toResponse() {
+    return { error: this.message, code: this.statusCode }
+  }
+}
+
+class NotFoundError extends AppError {
+  _tag = 'NotFoundError' as const
+  id: string
+  constructor(id: string) {
+    super(`Resource ${id} not found`)
+    this.name = 'NotFoundError'
+    this.id = id
+    this.statusCode = 404
+  }
+}
+
+// after
+class AppError extends Error {
+  statusCode = 500
+  toResponse() {
+    return { error: this.message, code: this.statusCode }
+  }
+}
+
+class NotFoundError extends errore.createTaggedError({
+  name: 'NotFoundError',
+  message: 'Resource $id not found',
+  extends: AppError,
+}) {
+  statusCode = 404
+}
+```
+
+### Boundary Rule — Don't Wrap Too Much
+
+```ts
+// before — business logic mixed into .catch
+async function getUser(id: string): Promise<AppError | User> {
+  return fetch(`/users/${id}`)
+    .then(async (res) => {
+      const data = await res.json()
+      if (!data.active) throw new Error('inactive')
+      return { ...data, displayName: `${data.first} ${data.last}` }
+    })
+    .catch((e) => new AppError({ id, cause: e }))
+}
+
+// before — wrapping your own code that already returns errors as values
+async function processOrder(id: string): Promise<OrderError | Order> {
+  return createOrder(id) // createOrder already returns errors!
+    .catch((e) => new OrderError({ id, cause: e }))
+}
+
+// after — .catch() only wraps the external dependency, nothing else
+async function getUser(id: string) {
+  const res = await fetch(`/users/${id}`).catch(
+    (e) => new NetworkError({ url: `/users/${id}`, cause: e }),
+  )
+  if (res instanceof Error) return res
+
+  const data = await (res.json() as Promise<UserPayload>).catch(
+    (e) => new NetworkError({ url: `/users/${id}`, cause: e }),
+  )
+  if (data instanceof Error) return data
+
+  // business logic is outside .catch — plain code, not wrapped
+  if (!data.active) return new InactiveUserError({ id })
+  return { ...data, displayName: `${data.first} ${data.last}` }
+}
+```
+
+### Resource Cleanup (defer)
+
+```ts
+// before — nested try-finally
+async function processRequest(id: string) {
+  const db = await connectDb()
+  try {
+    const cache = await openCache()
+    try {
+      // ... use db and cache ...
+      return result
+    } finally {
+      await cache.flush()
+    }
+  } finally {
+    await db.close()
+  }
+}
+
+// after — Go-like defer with DisposableStack
+import * as errore from 'errore'
+
+async function processRequest(id: string): Promise<DbError | Result> {
+  await using cleanup = new errore.AsyncDisposableStack()
+
+  const db = await connectDb().catch((e) => new DbError({ cause: e }))
+  if (db instanceof Error) return db
+  cleanup.defer(() => db.close())
+
+  const cache = await openCache().catch((e) => new CacheError({ cause: e }))
+  if (cache instanceof Error) return cache
+  cleanup.defer(() => cache.flush())
+
+  return result
+  // cleanup runs automatically in LIFO order:
+  // 1. cache.flush()
+  // 2. db.close()
+}
+```
+
+### Walking the Cause Chain
+
+```ts
+// before — only checks one level deep
+if (error.cause instanceof DbError) {
+  console.log(error.cause.host)
+}
+
+// after — walks the entire .cause chain (like Go's errors.As)
+const dbErr = error.findCause(DbError)
+if (dbErr) {
+  console.log(dbErr.host) // type-safe access
+}
+```
+
+### Abort & Cancellation
+
+```ts
+// before — plain Error or string, isAbortError can't detect it
+controller.abort(new Error('timeout'))
+controller.abort('timeout')
+
+// after — typed error extending AbortError
+class TimeoutError extends errore.createTaggedError({
+  name: 'TimeoutError',
+  message: 'Request timed out for $operation',
+  extends: errore.AbortError,
+}) {}
+controller.abort(new TimeoutError({ operation: 'fetch' }))
+```
+
+### Flat abort checks
+
+```ts
+// before — isAbortError hidden inside instanceof
+const result = await errore.tryAsync({
+  try: () => fetchData({ signal }),
+  catch: (e) => new FetchError({ cause: e }),
+})
+if (result instanceof Error) {
+  if (errore.isAbortError(result)) {
+    return 'Request timed out'
+  }
+  return `Failed: ${result.message}`
+}
+
+// after — flat early returns with .catch
+const result = await fetchData({ signal }).catch(
+  (e) => new FetchError({ cause: e }),
+)
+if (errore.isAbortError(result)) {
+  return 'Request timed out'
+}
+if (result instanceof Error) {
+  return `Failed: ${result.message}`
+}
+```
+
+### Don't reassign after narrowing
+
+```ts
+// before — unnecessary reassignment
+const result = await fetch(url).catch((e) => new FetchError({ cause: e }))
+if (result instanceof Error) {
+  return `Failed: ${result.message}`
+}
+const response = result // pointless — TS already knows result is Response
+await response.json()
+
+// after — just keep using the original variable
+const result = await fetch(url).catch((e) => new FetchError({ cause: e }))
+if (result instanceof Error) {
+  return `Failed: ${result.message}`
+}
+await result.json() // TS knows result is Response here
+```
+
+## TypeScript Migration Patterns
+
+### Don't annotate return types redundantly
+
+```ts
+// before — redundant annotation, TypeScript already infers this exact type
+function getUser(id: string): Promise<NotFoundError | User> {
+  const user = await db.find(id)
+  if (!user) return new NotFoundError({ id })
+  return user
+}
+
+// after — let inference do its job
+function getUser(id: string) {
+  const user = await db.find(id)
+  if (!user) return new NotFoundError({ id })
+  return user
+}
+
+// exception: explicit annotation when it adds clarity on a complex public API
+function processRequest(
+  req: Request,
+): Promise<ValidationError | AuthError | DbError | null | Response> {
+  // ...
+}
+```
+
+### Use isTruthy instead of Boolean
+
+```ts
+// before — TypeScript still thinks items is (User | null)[]
+const items = results.filter(Boolean)
+
+// after — properly narrows to User[]
+function isTruthy<T>(value: T): value is NonNullable<T> {
+  return Boolean(value)
+}
+const items = results.filter(isTruthy)
+```
+
+### Never silently suppress errors
+
+```ts
+// before — swallows the error, debugging nightmare
+try {
+  await sendEmail(user.email)
+} catch {}
+
+// after — log and continue if non-critical
+const emailResult = await sendEmail(user.email).catch(
+  (e) => new EmailError({ email: user.email, cause: e }),
+)
+if (emailResult instanceof Error) {
+  console.warn('Failed to send email:', emailResult.message)
+}
+```
+
 ## Quick Reference
 
 ```ts
