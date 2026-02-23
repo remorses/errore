@@ -62,6 +62,24 @@ console.log(user.name) // TypeScript knows: User
     await result.json() // TS knows result is Response here
     ```
 
+20. Always log errors that are not propagated — when an error branch doesn't `return` or `throw` the error (i.e. the error is intentionally swallowed), add a `console.warn` or `console.error` so failures are visible during debugging. Silent error swallowing makes bugs invisible:
+
+    ```ts
+    // BAD: error silently ignored — if sync fails you'll never know
+    const result = await syncToCloud(data)
+    if (result instanceof Error) {
+      // nothing here — silent failure
+    }
+
+    // GOOD: log before continuing — error is visible in logs
+    const result = await syncToCloud(data)
+    if (result instanceof Error) {
+      console.warn('Cloud sync failed:', result.message)
+    }
+    ```
+
+    > Propagated errors (`return error`) don't need logging — the caller handles them. But errors you choose to ignore must leave a trace. This applies to loops with `continue`, fallback branches, and any path where the error is intentionally dropped.
+
 ## TypeScript Rules
 
 - **Object args over positional** — `({id, retries})` not `(id, retries)` for functions with 2+ params
@@ -110,7 +128,7 @@ console.log(user.name) // TypeScript knows: User
   controller.abort(new TimeoutError({ operation: 'fetch' }))
   ```
 
-- **Never silently suppress errors in catch blocks** — empty `catch {}` hides failures. With errore you rarely need catch at all, but at boundaries where you must, always handle or log:
+- **Never silently suppress errors** — empty `catch {}` and unlogged error branches hide failures. With errore you rarely need catch at all, but at any boundary where an error is not propagated, always log it (see rule 20):
 
   ```ts
   const emailResult = await sendEmail(user.email).catch(
