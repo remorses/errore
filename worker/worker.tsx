@@ -400,9 +400,9 @@ async function getUser(id: string): Promise<NotFoundError | User> {
 
 // Compile error example
 const codeCompileError = `const user = await getUser(id)
-console.log(user.name)
-//                ~~~~
-// Error: Property 'name' does not exist on type 'NotFoundError'`
+console.log(user.username)
+//                ~~~~~~~~
+// Error: Property 'username' does not exist on type 'NotFoundError'`
 
 // Expression vs block
 const codeExpressionVsBlock = `// With errore: error handling is an expression
@@ -428,19 +428,19 @@ fmt.Println(user.Name)  // Compiles fine. Crashes at runtime.
 
 // TypeScript + errore: you cannot forget
 const user = await fetchUser(id)
-console.log(user.name)  // Won't compile until you handle the error.`
+console.log(user.username)  // Won't compile until you handle the error.`
 
 // Null handling
 const codeNullHandling = `// Errors and nulls work together naturally
 function findUser(id: string): NotFoundError | User | null {
   if (id === 'invalid') return new NotFoundError({ id })
   if (id === 'missing') return null
-  return { id, name: 'Alice' }
+  return { id, username: 'Alice' }
 }
 
 const user = findUser(id)
 if (user instanceof Error) return user
-const name = user?.name ?? 'Guest'`
+const username = user?.username ?? 'Guest'`
 
 // Tagged errors
 const codeTaggedErrors = `class NotFoundError extends errore.createTaggedError({
@@ -479,9 +479,9 @@ const user = await getUser(id)
 if (user instanceof NotFoundError) return 'not found'
 if (user instanceof NetworkError) return 'network issue'
 // Forgot ValidationError? TypeScript knows:
-return user.name
-//     ~~~~
-// TS Error: Property 'name' does not exist on type 'ValidationError'`
+return user.username
+//          ~~~~~~~~
+// TS Error: Property 'username' does not exist on type 'ValidationError'`
 
 // Migration: try-catch
 const codeMigrationBefore = `try {
