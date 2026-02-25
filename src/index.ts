@@ -4,6 +4,9 @@ export type { Errore, InferError, InferValue, EnsureNotError } from './types.js'
 // Core functions
 export { isError, isOk, tryFn, tryFn as try, tryAsync } from './core.js'
 
+// Generator helpers
+export { gen, ok } from './gen.js'
+
 // Transformations
 export {
   map,
