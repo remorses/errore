@@ -122,6 +122,38 @@ return { user, posts }
 
 ---
 
+## Generator Helpers
+
+Effect's `gen` gives linear control flow. errore now offers `gen` + `ok` with the same shape, but returns plain values and keeps unions.
+
+```typescript
+import { Effect } from 'effect'
+
+// !focus(1:12)
+const program = Effect.gen(function* () {
+  const user = yield* fetchUser(id)
+  const posts = yield* fetchPosts(user.id)
+  return { user, posts }
+})
+
+await Effect.runPromise(program)
+```
+
+```typescript
+import * as errore from 'errore'
+
+// !focus(1:9)
+const result = errore.gen(function* () {
+  const user = yield* errore.ok(getUser(id))
+  const posts = yield* errore.ok(getPosts(user.id))
+  return { user, posts }
+})
+
+if (result instanceof Error) return result
+```
+
+---
+
 ## Basic Error Handling
 
 Fetching a user and handling a potential error.
@@ -284,14 +316,19 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-// !focus(1:8)
+import * as errore from 'errore'
+
+// !focus(1:9)
 console.log('step 1...')
 
-const result = fetchData()
-// Fails — early return, skip the rest
-if (result instanceof Error) return result
+const result = errore.gen(function* () {
+  const user = yield* errore.ok(fetchUser(id))
+  const posts = yield* errore.ok(fetchPosts(user.id))
+  return { user, posts }
+})
 
-// Never reached if fetchData failed
+if (result instanceof Error) return result
+// Never reached if any step failed
 console.log('step 3...')
 ```
 
