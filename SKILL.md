@@ -79,6 +79,7 @@ console.log(user.name) // TypeScript knows: User
     ```
 
     > Propagated errors (`return error`) don't need logging — the caller handles them. But errors you choose to ignore must leave a trace. This applies to loops with `continue`, fallback branches, and any path where the error is intentionally dropped.
+21. Use `gen` + `ok` for linear error flow — `ok` yields the first error, `gen` returns it immediately. Only call `ok` inside `gen`.
 
 ## TypeScript Rules
 
@@ -330,6 +331,34 @@ return posts
 ```
 
 > Each error is checked at the point it occurs. TypeScript narrows the type after each check.
+
+### Generator Helpers (gen + ok)
+
+Use `gen` and `ok` to keep linear flow without nesting. `ok` yields the first error and `gen` short-circuits with it. Works with sync and async generators:
+
+```ts
+const result = errore.gen(function* () {
+  const user = yield* errore.ok(getUser(id))
+  const posts = yield* errore.ok(getPosts(user.id))
+  return { user, posts }
+})
+// inferred type: NotFoundError | NetworkError | { user: User; posts: Post[] }
+
+if (result instanceof Error) return result
+return result
+```
+
+```ts
+const result = await errore.gen(async function* () {
+  const user = yield* errore.ok(await getUser(id))
+  const posts = yield* errore.ok(await getPosts(user.id))
+  return { user, posts }
+})
+// inferred type: Promise<NotFoundError | NetworkError | { user: User; posts: Post[] }>
+
+if (result instanceof Error) return result
+return result
+```
 
 ### Wrapping External Libraries
 
