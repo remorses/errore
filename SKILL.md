@@ -293,16 +293,16 @@ class NotFoundError extends errore.createTaggedError({
 **Instance properties:**
 
 ```ts
-err._tag        // 'NotFoundError'
-err.id          // 'abc' (from $id)
-err.database    // 'users' (from $database)
-err.message     // 'User abc not found in users'
+err._tag // 'NotFoundError'
+err.id // 'abc' (from $id)
+err.database // 'users' (from $database)
+err.message // 'User abc not found in users'
 err.messageTemplate // 'User $id not found in $database'
 err.fingerprint // ['NotFoundError', 'User $id not found in $database']
-err.cause       // original error if wrapped
-err.toJSON()    // structured JSON with all properties
+err.cause // original error if wrapped
+err.toJSON() // structured JSON with all properties
 err.findCause(DbError) // walks .cause chain, returns typed match or undefined
-NotFoundError.is(val)  // static type guard
+NotFoundError.is(val) // static type guard
 ```
 
 ### Returning Errors
