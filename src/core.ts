@@ -79,18 +79,33 @@ export function tryFn<T, E extends Error>(
 /**
  * Execute an async function and return either the value or an error.
  *
- * @overload Simple form - wraps exceptions in UnhandledError
- * @example
- * const result = await tryAsync(() => fetch(url).then(r => r.json()))
- * // result: UnhandledError | unknown
+ * @deprecated Use `.catch()` directly on the promise instead. It's simpler,
+ * composes naturally with async/await, and TypeScript infers the union
+ * automatically. `tryAsync` adds an unnecessary wrapper around what `.catch()`
+ * already does.
  *
- * @overload With custom catch - you control the error type
- * @example
+ * @example Migration from tryAsync to .catch()
+ * ```ts
+ * // Before (tryAsync):
  * const result = await tryAsync({
  *   try: () => fetch(url),
- *   catch: (e) => new NetworkError({ cause: e })
+ *   catch: (e) => new NetworkError({ url, cause: e }),
  * })
- * // result: NetworkError | Response
+ *
+ * // After (.catch):
+ * const result = await fetch(url)
+ *   .catch((e) => new NetworkError({ url, cause: e }))
+ * ```
+ *
+ * @example Simple form migration
+ * ```ts
+ * // Before:
+ * const result = await tryAsync(() => fetch(url).then(r => r.json()))
+ *
+ * // After:
+ * const result = await fetch(url).then(r => r.json())
+ *   .catch((e) => new NetworkError({ url, cause: e }))
+ * ```
  */
 export function tryAsync<T>(fn: () => Promise<T>): Promise<UnhandledError | T>
 export function tryAsync<T, E extends Error>(opts: {
