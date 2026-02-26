@@ -577,6 +577,86 @@ if (res instanceof Error) return res
 
 > `isAbortError` detects three kinds of abort: (1) native `DOMException` from bare `controller.abort()`, (2) direct `errore.AbortError` instances, (3) tagged errors that extend `errore.AbortError` — even when wrapped in another error's `.cause` chain.
 
+#### Early Return on Abort (signal.aborted checks)
+
+Just like early returns for errors (`if (x instanceof Error) return x`), check `signal.aborted` before side effects or async operations to stop work as soon as possible. Without these checks, cancelled work keeps running — wasting resources and potentially writing stale data.
+
+Place `signal.aborted` checks **before** expensive or effectful operations: network requests, database writes, file I/O, external API calls, or anything that takes time or mutates state. This is especially important in loops and multi-step pipelines.
+
+```ts
+async function processItems({
+  items,
+  signal,
+}: {
+  items: Item[]
+  signal: AbortSignal
+}) {
+  const results: ProcessedItem[] = []
+
+  for (const item of items) {
+    if (signal.aborted) return
+
+    const data = await fetchData(item.id, { signal }).catch(
+      (e) => new FetchError({ id: item.id, cause: e }),
+    )
+    if (errore.isAbortError(data)) return
+    if (data instanceof Error) {
+      console.warn('Skipping', item.id, data.message)
+      continue
+    }
+
+    // check again before the write — fetchData may have taken a while
+    if (signal.aborted) return
+
+    const saved = await db.save(data).catch(
+      (e) => new DbError({ cause: e }),
+    )
+    if (saved instanceof Error) return saved
+
+    results.push(saved)
+  }
+
+  return results
+}
+```
+
+In multi-step functions without loops, sprinkle checks between each async call:
+
+```ts
+async function deployService({
+  config,
+  signal,
+}: {
+  config: DeployConfig
+  signal: AbortSignal
+}) {
+  const image = await buildImage(config).catch(
+    (e) => new BuildError({ cause: e }),
+  )
+  if (image instanceof Error) return image
+
+  if (signal.aborted) return
+
+  const pushed = await pushToRegistry(image, { signal }).catch(
+    (e) => new RegistryError({ cause: e }),
+  )
+  if (errore.isAbortError(pushed)) return
+  if (pushed instanceof Error) return pushed
+
+  if (signal.aborted) return
+
+  // don't start a rollout if we've been cancelled
+  const deployed = await rollout(pushed, config).catch(
+    (e) => new RolloutError({ cause: e }),
+  )
+  if (deployed instanceof Error) return deployed
+
+  return deployed
+}
+```
+
+> Think of `signal.aborted` checks as abort early returns — same pattern as error early returns but for cancellation. Place them before side effects the same way you'd place `instanceof Error` checks after async calls. Both keep the happy path flat and make the function responsive to the outside world.
+
 ## Pitfalls
 
 ### CustomError | Error is ambiguous when CustomError extends Error
