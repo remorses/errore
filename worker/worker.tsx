@@ -422,14 +422,6 @@ try {
 }`
 
 // Go comparison
-const codeGoComparison = `// Go: you can forget to check err
-user, err := fetchUser(id)
-fmt.Println(user.Name)  // Compiles fine. Crashes at runtime.
-
-// TypeScript + errore: you cannot forget
-const user = await fetchUser(id)
-console.log(user.username)  // Won't compile until you handle the error.`
-
 // Null handling
 const codeNullHandling = `// Errors and nulls work together naturally
 function findUser(id: string): NotFoundError | User | null {
@@ -849,17 +841,6 @@ function Page() {
           <pre
             class="language-markdown"
           ><code class="language-markdown">${codeAgentsMd}</code></pre>
-
-          <p>
-            <strong>Better than Go.</strong> This is Go-style error
-            handling—errors as values, not exceptions. But with one key
-            difference: Go's two return values let you ignore the error and use
-            the value anyway. A single union makes that impossible:
-          </p>
-
-          <pre
-            class="language-typescript"
-          ><code class="language-typescript">${codeGoComparison}</code></pre>
 
           <p>
             <strong>Errors and nulls together.</strong> Use <code>?.</code> and
