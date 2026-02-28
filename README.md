@@ -402,6 +402,34 @@ const response = await errore.tryAsync({
 > - **Keep the callback minimal** — wrap only the single throwing call, not your business logic. The `try` callback should be a one-liner.
 > - **Always prefer `errore.try` over `errore.tryFn`** — they are the same function, but `try` is the canonical name.
 
+### Generator Helpers
+
+Use `gen` and `ok` to write linear, early-return flow without nesting. `ok` yields the first error and `gen` returns it immediately. Works with sync and async generators:
+
+```ts
+import * as errore from 'errore'
+
+const result = errore.gen(function* () {
+  const user = yield* errore.ok(getUser(id))
+  const posts = yield* errore.ok(getPosts(user.id))
+  return { user, posts }
+})
+
+if (result instanceof Error) return result
+```
+
+```ts
+import * as errore from 'errore'
+
+const result = await errore.gen(async function* () {
+  const user = yield* errore.ok(await getUser(id))
+  const posts = yield* errore.ok(await getPosts(user.id))
+  return { user, posts }
+})
+```
+
+`ok` is only valid inside `gen`. It returns the value for non-errors and short-circuits on the first error.
+
 ### Transformations
 
 **Transform and chain** operations:

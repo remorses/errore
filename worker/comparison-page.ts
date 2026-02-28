@@ -98,15 +98,15 @@ export async function renderComparisonPage(mdContent: string): Promise<string> {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>errore vs Effect — Side-by-Side Comparison</title>
-  <meta name="description" content="Compare Effect.ts and errore side by side. See how typed error handling looks with each approach." />
+  <meta name="description" content="Compare Effect.ts and errore side by side, including generator helpers and typed error handling patterns." />
   <meta property="og:title" content="errore vs Effect — Side-by-Side Comparison" />
-  <meta property="og:description" content="Compare Effect.ts and errore side by side. See how typed error handling looks with each approach." />
+  <meta property="og:description" content="Compare Effect.ts and errore side by side, including generator helpers and typed error handling patterns." />
   <meta property="og:image" content="https://errore.org/og-errore-vs-effect.png" />
   <meta property="og:url" content="https://errore.org/errore-vs-effect" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="errore vs Effect — Side-by-Side Comparison" />
-  <meta name="twitter:description" content="Compare Effect.ts and errore side by side. See how typed error handling looks with each approach." />
+  <meta name="twitter:description" content="Compare Effect.ts and errore side by side, including generator helpers and typed error handling patterns." />
   <meta name="twitter:image" content="https://errore.org/og-errore-vs-effect.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -117,7 +117,7 @@ export async function renderComparisonPage(mdContent: string): Promise<string> {
   <header class="page-header">
     <a href="/" class="back-link">&larr; errore.org</a>
     <h1>errore <span class="vs">vs</span> Effect</h1>
-    <p class="subtitle">Side-by-side comparison of typed error handling approaches in TypeScript.</p>
+    <p class="subtitle">Side-by-side comparison of typed error handling approaches in TypeScript, including generator helpers.</p>
   </header>
   <main>
     ${sectionsHtml.join('\n')}

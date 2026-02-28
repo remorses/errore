@@ -421,6 +421,27 @@ try {
   ...
 }`
 
+// Generator helpers
+const codeGenHelpers = `const result = errore.gen(function* () {
+  const user = yield* errore.ok(getUser(id))
+  const posts = yield* errore.ok(getPosts(user.id))
+  return { user, posts }
+})
+// inferred type: NotFoundError | NetworkError | { user: User; posts: Post[] }
+
+if (result instanceof Error) return result
+return result`
+
+const codeGenHelpersAsync = `const result = await errore.gen(async function* () {
+  const user = yield* errore.ok(await getUser(id))
+  const posts = yield* errore.ok(await getPosts(user.id))
+  return { user, posts }
+})
+// inferred type: Promise<NotFoundError | NetworkError | { user: User; posts: Post[] }>
+
+if (result instanceof Error) return result
+return result`
+
 // Go comparison
 // Null handling
 const codeNullHandling = `// Errors and nulls work together naturally
@@ -885,6 +906,22 @@ function Page() {
             This guarantees every error flow is handled. No silent failures. No
             forgotten edge cases.
           </p>
+
+          <h2>Generator Helpers</h2>
+
+          <p>
+            Prefer linear flow without nested checks. <code>gen</code> and
+            <code>ok</code> short-circuit on the first error and return a union
+            value directly.
+          </p>
+
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeGenHelpers}</code></pre>
+
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeGenHelpersAsync}</code></pre>
 
           <h2>Migration</h2>
 
