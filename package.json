@@ -25,7 +25,7 @@
   "files": [
     "dist",
     "src",
-    "SKILL.md"
+    "skills"
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",

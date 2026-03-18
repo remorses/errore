@@ -13,6 +13,8 @@ if (command === 'skill') {
   const skillPath = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     '..',
+    'skills',
+    'errore',
     'SKILL.md',
   )
   const content = fs.readFileSync(skillPath, 'utf-8')
