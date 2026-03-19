@@ -48,11 +48,11 @@ export function isOk<V>(value: V): value is Exclude<V, Error> {
  * // result: ParseError | unknown
  */
 export function tryFn<T>(fn: () => T): UnhandledError | T
-export function tryFn<T, E extends Error>(opts: {
+export function tryFn<T, E>(opts: {
   try: () => T
   catch: (e: Error) => E
 }): E | T
-export function tryFn<T, E extends Error>(
+export function tryFn<T, E>(
   fnOrOpts: (() => T) | { try: () => T; catch: (e: Error) => E },
 ): UnhandledError | E | T {
   if (typeof fnOrOpts === 'function') {
@@ -108,11 +108,11 @@ export function tryFn<T, E extends Error>(
  * ```
  */
 export function tryAsync<T>(fn: () => Promise<T>): Promise<UnhandledError | T>
-export function tryAsync<T, E extends Error>(opts: {
+export function tryAsync<T, E>(opts: {
   try: () => Promise<T>
   catch: (e: Error) => E | Promise<E>
 }): Promise<E | T>
-export async function tryAsync<T, E extends Error>(
+export async function tryAsync<T, E>(
   fnOrOpts:
     | (() => Promise<T>)
     | { try: () => Promise<T>; catch: (e: Error) => E | Promise<E> },

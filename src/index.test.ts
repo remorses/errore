@@ -146,6 +146,42 @@ describe('tryFn', () => {
       expect(result.field).toBe('json')
     }
   })
+
+  test('catch returning undefined swallows the error', () => {
+    const result = tryFn({
+      try: (): string => {
+        throw new Error('boom')
+      },
+      catch: () => undefined,
+    })
+
+    // result should be string | undefined
+    expect(result).toBeUndefined()
+  })
+
+  test('catch returning a non-Error fallback value', () => {
+    const result = tryFn({
+      try: (): number => {
+        throw new Error('boom')
+      },
+      catch: () => -1,
+    })
+
+    // result should be number (both branches return number)
+    expect(result).toBe(-1)
+  })
+
+  test('catch returning null swallows the error', () => {
+    const result = tryFn({
+      try: (): string => {
+        throw new Error('boom')
+      },
+      catch: () => null,
+    })
+
+    // result should be string | null
+    expect(result).toBeNull()
+  })
 })
 
 describe('tryAsync', () => {
