@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.14.1
+
+1. **Fixed `tryFn`/`tryAsync` catch handler accepting non-Error return values** — the `catch` callback previously required returning an `Error` subclass. It now accepts any value: returning `undefined`, `null`, or a fallback value swallows the error and widens the result union accordingly:
+   ```ts
+   const result = errore.try({
+     try: () => JSON.parse(input),
+     catch: () => undefined,   // result: ParsedType | undefined
+   })
+   ```
+2. **`tryAsync` marked as deprecated** — use `.catch()` directly on the promise instead. It composes naturally with async/await and TypeScript infers the union automatically without a wrapper:
+   ```ts
+   // Before:
+   const result = await tryAsync({ try: () => fetch(url), catch: (e) => new NetworkError({ cause: e }) })
+
+   // After:
+   const result = await fetch(url).catch((e) => new NetworkError({ url, cause: e }))
+   ```
+3. **Fixed `errore skill` CLI command** — the SKILL.md file was relocated to `skills/errore/SKILL.md` and the CLI path lookup was updated to match. Running `errore skill` now correctly outputs the skill content.
+
 ## 0.14.0
 
 - Make `message` optional in `createTaggedError` — omitting it defaults to `'$message'`, so callers can pass the message at construction time without defining it in the template
