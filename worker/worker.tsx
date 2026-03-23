@@ -551,6 +551,48 @@ const codeMigrationValidateAfter = `function createUser(input: unknown): Validat
   return { email: input.email, name: input.name }
 }`
 
+// Migration: try/finally resource cleanup
+const codeMigrationFinallyBefore = `async function importData(url: string, dbUrl: string) {
+  const db = await connectDb(dbUrl)
+  try {
+    const tmpFile = await createTempFile()
+    try {
+      const response = await fetch(url)
+      const data = await response.text()
+      await tmpFile.write(data)
+      await db.import(tmpFile.path)
+      return { rows: await db.count() }
+    } finally {
+      await tmpFile.delete()
+    }
+  } finally {
+    await db.close()
+  }
+}`
+
+const codeMigrationFinallyAfter = `async function importData(
+  url: string, dbUrl: string
+): Promise<ImportError | { rows: number }> {
+  await using cleanup = new errore.AsyncDisposableStack()
+
+  const db = await connectDb(dbUrl)
+    .catch(e => new ImportError({ reason: 'db connect', cause: e }))
+  if (db instanceof Error) return db
+  cleanup.defer(() => db.close())
+
+  const tmpFile = await createTempFile()
+  cleanup.defer(() => tmpFile.delete())
+
+  const response = await fetch(url)
+    .catch(e => new ImportError({ reason: 'fetch', cause: e }))
+  if (response instanceof Error) return response
+
+  await tmpFile.write(await response.text())
+  await db.import(tmpFile.path)
+  return { rows: await db.count() }
+  // cleanup: tmpFile.delete() → db.close()
+}`
+
 // Why not neverthrow / better-result
 const codeNeverthrow = `// neverthrow / better-result
 import { ok, err, Result } from 'neverthrow'
@@ -940,6 +982,20 @@ function Page() {
           <pre
             class="language-typescript"
           ><code class="language-typescript">${codeMigrationValidateAfter}</code></pre>
+
+          <p>
+            <strong>try/finally resource cleanup:</strong> Each resource adds
+            another level of nesting. With <code>await using</code> +
+            <code>DisposableStack</code>, cleanup is flat — one
+            <code>cleanup.defer()</code> per resource, runs in reverse order
+            when the scope exits:
+          </p>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationFinallyBefore}</code></pre>
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeMigrationFinallyAfter}</code></pre>
 
           <h2>Resource Cleanup</h2>
 
