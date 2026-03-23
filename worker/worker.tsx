@@ -676,6 +676,27 @@ export function parse(input: string): AST | ParseError
 // Users handle errors with standard instanceof
 // No new dependencies, no new concepts`
 
+// lintcn: no-unhandled-error
+const codeLintcnInstall = `npm install -D lintcn
+npx lintcn add https://github.com/remorses/lintcn/tree/main/.lintcn/no_unhandled_error
+npx lintcn lint`
+
+const codeLintcnBad = `declare function getUser(id: string): Error | User
+
+getUser("123")          // error: Error-typed return value is not handled
+await fetchData("/api") // error: Promise<Error | Data> resolved but not checked`
+
+const codeLintcnGood = `// Assigned — you'll check it
+const user = getUser("123")
+if (user instanceof Error) return user
+
+// Explicitly discarded with void
+void getUser("123")
+
+// void/undefined returns — nothing to handle
+console.log("hello")
+arr.push(1)`
+
 // AI Agents skill install
 const codeSkillInstall = `npx skills add remorses/errore`
 
@@ -968,12 +989,9 @@ function Page() {
           </p>
 
           <p>
-            neverthrow requires an
-            <a href="https://github.com/mdbetancourt/eslint-plugin-neverthrow"
-              >eslint plugin</a
-            >
-            to catch unhandled results. With errore, TypeScript itself prevents
-            using a value without checking the error first.
+            neverthrow requires a separate plugin to catch unhandled
+            results. With errore, TypeScript itself prevents using a value
+            without checking the error first.
           </p>
 
           <h2>Vs Effect.ts</h2>
@@ -1048,6 +1066,58 @@ function Page() {
             Your library stays lightweight. Users get type-safe errors without
             adopting an opinionated wrapper.
           </p>
+
+          <h2>Linting: Closing the Last Gap</h2>
+
+          <p>
+            TypeScript catches unhandled errors when you access properties on the
+            union — but there's one case it can't catch: <strong>discarded return
+            values</strong>. If you call a function returning
+            <code>Error | T</code> and never assign the result, TypeScript won't
+            complain.
+          </p>
+
+          <p>
+            <a href="https://github.com/remorses/lintcn">lintcn</a> is the
+            <a href="https://ui.shadcn.com">shadcn</a> for
+            <strong>type-aware</strong> TypeScript lint rules. You add rules by
+            URL, own the source (Go files in <code>.lintcn/</code>), and
+            customize freely.             Rules use the TypeScript <strong>type
+            checker</strong> — they see resolved types, not just syntax — so
+            they catch things syntax-only linters can't.
+          </p>
+
+          <p>
+            lintcn ships a <code>no-unhandled-error</code> rule built for the
+            errore convention. It flags any expression statement where the return
+            type includes <code>Error</code> and the result is discarded:
+          </p>
+
+          <pre
+            class="language-bash"
+          ><code class="language-bash">${codeLintcnInstall}</code></pre>
+
+          <p><strong>What gets flagged:</strong></p>
+
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeLintcnBad}</code></pre>
+
+          <p><strong>What is NOT flagged:</strong></p>
+
+          <pre
+            class="language-typescript"
+          ><code class="language-typescript">${codeLintcnGood}</code></pre>
+
+          <p>
+            Because the rule uses the type checker, it only flags calls
+            returning Error-typed unions. Zero false positives on
+            <code>void</code>-returning functions like
+            <code>console.log</code>. Combined with errore's
+            <code>instanceof</code> narrowing, this gives you complete
+            protection: every error must be either handled or explicitly
+            discarded with <code>void</code>.
+          </p>
         </main>
 
         <footer>
@@ -1056,7 +1126,8 @@ function Page() {
           ><code class="language-bash">npm install errore</code></pre>
           <p>
             <a href="https://github.com/remorses/errore">GitHub</a> ·
-            <a href="/errore-vs-effect">errore vs Effect</a> · Made by
+            <a href="/errore-vs-effect">errore vs Effect</a> ·
+            <a href="https://github.com/remorses/lintcn">lintcn</a> · Made by
             <a href="https://github.com/remorses">remorses</a>
           </p>
         </footer>

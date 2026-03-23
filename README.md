@@ -630,48 +630,65 @@ Since errore uses a **single union variable** instead of two separate values, Ty
 
 > **Note:** Properties that exist on both `Error` and your value type (like `name`, `message`) can still be accessed without narrowing. This is a small set of 4 fields: `name`, `message`, `stack`, `cause`.
 
-### The Remaining Gap
+### The Remaining Gap: Ignored Return Values
 
-There's still one case errore can't catch: **ignored return values**:
+There's one case TypeScript alone can't catch — **discarded return values**:
 
 ```ts
-// Oops! Completely ignoring the return value
-updateUser(id, data) // No error, but we should check!
+updateUser(id, data) // returns Error | User, but result is thrown away
+await fetchData(url)  // returns Error | Data, silently ignored
 ```
 
-For this, use **TypeScript's built-in checks** or a linter:
+The caller forgot to assign the result and check `instanceof Error`. TypeScript won't complain because expression statements are valid syntax.
 
-**TypeScript `tsconfig.json`:**
+### lintcn: `no-unhandled-error`
 
-```json
-{
-  "compilerOptions": {
-    "noUnusedLocals": true
-  }
-}
-```
+[lintcn](https://github.com/remorses/lintcn) is the [shadcn](https://ui.shadcn.com) for **type-aware** TypeScript lint rules. You add rules by URL, own the source (Go files in `.lintcn/`), and customize freely. Rules use the TypeScript **type checker** — they see resolved types, not just syntax — so they catch things syntax-only linters can't.
 
-This catches unused variables, though not ignored return values directly.
-
-**oxlint `no-unused-expressions`:**
-
-`oxlint.json`:
-
-```json
-{
-  "rules": {
-    "no-unused-expressions": "error"
-  }
-}
-```
-
-Or via CLI:
+lintcn ships a `no-unhandled-error` rule built specifically for the errore convention. It flags any expression statement where the return type includes `Error` (or any Error subclass) and the result is discarded:
 
 ```bash
-oxlint --deny no-unused-expressions
+# Install lintcn
+npm install -D lintcn
+
+# Add the no-unhandled-error rule
+npx lintcn add https://github.com/remorses/lintcn/tree/main/.lintcn/no_unhandled_error
+
+# Lint your project
+npx lintcn lint
 ```
 
-Combined with errore's type safety, these tools give you near-complete protection against ignored errors.
+**What gets flagged:**
+
+```ts
+declare function getUser(id: string): Error | User
+
+getUser("123")          // error: Error-typed return value is not handled
+await fetchData("/api") // error: Promise<Error | Data> resolved but not checked
+db.query("SELECT 1")   // error: Error | { rows: any[] } discarded
+```
+
+**What is NOT flagged:**
+
+```ts
+// Assigned to variable — you'll check it
+const user = getUser("123")
+if (user instanceof Error) return user
+
+// Explicitly discarded with void
+void getUser("123")
+
+// void/undefined/never returns — nothing to handle
+console.log("hello")
+arr.push(1)
+
+// Return statement — caller handles it
+function wrapper() { return getUser("123") }
+```
+
+Because the rule uses the type checker, it only flags calls that return Error-typed unions — zero false positives on void-returning functions like `console.log` or `arr.push`.
+
+The rule lives in `.lintcn/no_unhandled_error/` — you own the source and can customize it. Combined with errore's `instanceof Error` narrowing, this closes the last gap: every error must be either handled or explicitly discarded with `void`.
 
 ## Comparison with Result Types
 
@@ -735,7 +752,7 @@ console.log(user.name) // it's already the user
 | Bundle size         | ~3KB min                                     | **~0 bytes**      |
 | Interop             | Requires wrapping/unwrapping at boundaries   | Native TypeScript |
 
-neverthrow also requires an [eslint plugin](https://github.com/mdbetancourt/eslint-plugin-neverthrow) to catch unhandled results. With errore, TypeScript itself prevents you from using a value without checking the error first.
+neverthrow also requires a separate plugin to catch unhandled results. With errore, TypeScript itself prevents you from using a value without checking the error first.
 
 ## Vs Effect.ts
 

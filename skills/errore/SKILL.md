@@ -608,6 +608,18 @@ for (const item of items) {
 
 > Place `signal.aborted` checks **before** expensive operations (network, db writes, file I/O). Check `isAbortError` **after** async calls that received the signal. Both keep the function responsive to cancellation.
 
+## Linting: `no-unhandled-error`
+
+[lintcn](https://github.com/remorses/lintcn) provides a type-aware `no-unhandled-error` rule that catches discarded `Error | T` return values at lint time. Because it uses the TypeScript type checker, it only flags calls returning Error-typed unions — zero false positives on `void`-returning functions like `console.log`.
+
+```bash
+npm install -D lintcn
+npx lintcn add https://github.com/remorses/lintcn/tree/main/.lintcn/no_unhandled_error
+npx lintcn lint
+```
+
+Flags: `getUser("id")` when return type is `Error | User`. Does not flag: `void getUser("id")`, `const x = getUser("id")`, `console.log("hi")`. This closes the last gap where TypeScript can't enforce error handling — discarded return values.
+
 ## Pitfalls
 
 ### CustomError | Error is ambiguous when CustomError extends Error
