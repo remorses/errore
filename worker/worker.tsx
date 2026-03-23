@@ -983,13 +983,26 @@ function Page() {
             class="language-typescript"
           ><code class="language-typescript">${codeMigrationValidateAfter}</code></pre>
 
+          <h2>try/finally → <code>using</code></h2>
+
           <p>
-            <strong>try/finally resource cleanup:</strong> Each resource adds
-            another level of nesting. With <code>await using</code> +
-            <code>DisposableStack</code>, cleanup is flat — one
-            <code>cleanup.defer()</code> per resource, runs in reverse order
-            when the scope exits:
+            <code>try/finally</code> has a structural problem:
+            <strong>every resource adds a nesting level</strong>. Two resources
+            means two levels of indentation. Three means three. The business
+            logic gets buried deeper with each resource you add, and the cleanup
+            code is split across multiple <code>finally</code> blocks far from
+            where the resource was acquired.
           </p>
+
+          <p>
+            <code>await using</code> + <code>DisposableStack</code> fixes this.
+            Each resource is one <code>cleanup.defer()</code> call right next to
+            where it's created. The function stays flat — same indentation
+            whether you have one resource or ten. Cleanup runs automatically
+            in reverse order when the scope exits, on every path: normal return,
+            early error return, or exception.
+          </p>
+
           <pre
             class="language-typescript"
           ><code class="language-typescript">${codeMigrationFinallyBefore}</code></pre>
@@ -997,28 +1010,12 @@ function Page() {
             class="language-typescript"
           ><code class="language-typescript">${codeMigrationFinallyAfter}</code></pre>
 
-          <h2>Resource Cleanup</h2>
-
           <p>
-            errore ships <code>DisposableStack</code> polyfills for Go-like
-            <code>defer</code> cleanup. Use with TypeScript's
-            <code>using</code> keyword — cleanup runs automatically when the
-            scope exits, in reverse order:
-          </p>
-
-          <pre
-            class="language-typescript"
-          ><code class="language-typescript">${codeDeferBefore}</code></pre>
-
-          <pre
-            class="language-typescript"
-          ><code class="language-typescript">${codeDeferAfter}</code></pre>
-
-          <p>
-            <code>await using</code> guarantees cleanup on every exit path —
-            normal return, early error return, or exception. No
-            <code>try/finally</code> nesting. Adding more resources is just
-            another <code>cleanup.defer()</code>.
+            errore ships <code>DisposableStack</code> and
+            <code>AsyncDisposableStack</code> polyfills that work in every
+            runtime. Use with TypeScript's <code>using</code> /
+            <code>await using</code> keywords — no native
+            <code>DisposableStack</code> support needed.
           </p>
 
           <h2>Vs neverthrow / better-result</h2>
