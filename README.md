@@ -377,10 +377,10 @@ import * as errore from 'errore'
 const parsed = errore.try(() => JSON.parse(input))
 
 // Sync - with custom error type
-const parsed = errore.try({
-  try: () => JSON.parse(input),
-  catch: (e) => new ParseError({ reason: e.message, cause: e }),
-})
+const parsed = errore.try(
+  () => JSON.parse(input),
+  (e) => new ParseError({ reason: e.message, cause: e }),
+)
 
 // Async — prefer .catch() for promises (no wrapper needed)
 const response = await fetch(url).catch(
@@ -388,10 +388,10 @@ const response = await fetch(url).catch(
 )
 
 // Async — errore.tryAsync also works, but .catch() is preferred
-const response = await errore.tryAsync({
-  try: () => fetch(url),
-  catch: (e) => new NetworkError({ url, cause: e }),
-})
+const response = await errore.tryAsync(
+  () => fetch(url),
+  (e) => new NetworkError({ url, cause: e }),
+)
 ```
 
 > **Best practices for `try` / `tryAsync`:**

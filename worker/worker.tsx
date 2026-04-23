@@ -666,10 +666,10 @@ const codeDeferAfter = `// Go-like defer with await using
 async function processOrder(orderId: string): Promise<DbError | Receipt> {
   await using cleanup = new errore.AsyncDisposableStack()
 
-  const db = await errore.tryAsync({
-    try: () => connectDb(),
-    catch: (e) => new DbError({ orderId, cause: e }),
-  })
+  const db = await errore.tryAsync(
+    () => connectDb(),
+    (e) => new DbError({ orderId, cause: e }),
+  )
   if (db instanceof Error) return db
   cleanup.defer(() => db.close())
 

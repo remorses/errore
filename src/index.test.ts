@@ -135,11 +135,10 @@ describe('tryFn', () => {
   })
 
   test('custom catch returns typed error', () => {
-    const result = tryFn({
-      try: () => JSON.parse('invalid'),
-      catch: () =>
-        new ValidationError({ field: 'json', message: 'Invalid JSON' }),
-    })
+    const result = tryFn(
+      () => JSON.parse('invalid'),
+      () => new ValidationError({ field: 'json', message: 'Invalid JSON' }),
+    )
 
     if (result instanceof ValidationError) {
       // TypeScript knows: result is ValidationError
@@ -148,36 +147,36 @@ describe('tryFn', () => {
   })
 
   test('catch returning undefined swallows the error', () => {
-    const result = tryFn({
-      try: (): string => {
+    const result = tryFn(
+      (): string => {
         throw new Error('boom')
       },
-      catch: () => undefined,
-    })
+      () => undefined,
+    )
 
     // result should be string | undefined
     expect(result).toBeUndefined()
   })
 
   test('catch returning a non-Error fallback value', () => {
-    const result = tryFn({
-      try: (): number => {
+    const result = tryFn(
+      (): number => {
         throw new Error('boom')
       },
-      catch: () => -1,
-    })
+      () => -1,
+    )
 
     // result should be number (both branches return number)
     expect(result).toBe(-1)
   })
 
   test('catch returning null swallows the error', () => {
-    const result = tryFn({
-      try: (): string => {
+    const result = tryFn(
+      (): string => {
         throw new Error('boom')
       },
-      catch: () => null,
-    })
+      () => null,
+    )
 
     // result should be string | null
     expect(result).toBeNull()
@@ -200,10 +199,10 @@ describe('tryAsync', () => {
   })
 
   test('custom catch with async function', async () => {
-    const result = await tryAsync({
-      try: () => Promise.reject(new Error('network')),
-      catch: () => new NetworkError({ url: '/api', message: 'Failed' }),
-    })
+    const result = await tryAsync(
+      () => Promise.reject(new Error('network')),
+      () => new NetworkError({ url: '/api', message: 'Failed' }),
+    )
 
     if (result instanceof Error) {
       // TypeScript knows: result is NetworkError

@@ -201,10 +201,10 @@ async function loadConfig(): Promise<Config> {
     .catch((e) => new ConfigError({ reason: 'Read failed', cause: e }))
   if (raw instanceof Error) return { port: 3000 }
 
-  const parsed = errore.try({
-    try: () => JSON.parse(raw) as Config,
-    catch: (e) => new ConfigError({ reason: 'Invalid JSON', cause: e }),
-  })
+  const parsed = errore.try(
+    () => JSON.parse(raw) as Config,
+    (e) => new ConfigError({ reason: 'Invalid JSON', cause: e }),
+  )
   if (parsed instanceof Error) return { port: 3000 }
 
   if (!parsed.port) return { port: 3000 }
@@ -357,7 +357,7 @@ async function fetchJson<T>(url: string): Promise<NetworkError | T> {
 
 `.catch()` and `errore.try` should only appear at the **lowest level** of your call stack — right at the boundary with code you don't control (third-party libraries, `JSON.parse`, `fetch`, file I/O, etc.). Your own functions should never throw, so they never need `.catch()` or `try`.
 
-For **async** boundaries: use `.catch((e) => new MyError({ cause: e }))` directly on the promise. TypeScript infers the union automatically. For **sync** boundaries: use `errore.try({ try: () => ..., catch: (e) => ... })`. The `.catch()` callback receives `any` (Promise rejections are untyped), but wrapping in a typed error gives the union a concrete type — no `as` assertions needed.
+For **async** boundaries: use `.catch((e) => new MyError({ cause: e }))` directly on the promise. TypeScript infers the union automatically. For **sync** boundaries: use `errore.try(() => ..., (e) => ...)`. The `.catch()` callback receives `any` (Promise rejections are untyped), but wrapping in a typed error gives the union a concrete type — no `as` assertions needed.
 
 ```ts
 async function getUser(id: string) {

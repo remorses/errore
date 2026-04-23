@@ -39,40 +39,35 @@ export function isOk<V>(value: V): value is Exclude<V, Error> {
  * const result = tryFn(() => JSON.parse(input))
  * // result: UnhandledError | unknown
  *
- * @overload With custom catch - you control the error type
+ * @overload Positional args - you control the error type
  * @example
- * const result = tryFn({
- *   try: () => JSON.parse(input),
- *   catch: (e) => new ParseError({ cause: e })
- * })
+ * const result = tryFn(
+ *   () => JSON.parse(input),
+ *   (e) => new ParseError({ cause: e }),
+ * )
  * // result: ParseError | unknown
  */
 export function tryFn<T>(fn: () => T): UnhandledError | T
-export function tryFn<T, E>(opts: {
-  try: () => T
-  catch: (e: Error) => E
-}): E | T
+export function tryFn<T, E>(fn: () => T, catchFn: (e: Error) => E): E | T
+/** @deprecated Use positional args: tryFn(fn, catchFn) */
+export function tryFn<T, E>(opts: { try: () => T; catch: (e: Error) => E }): E | T
 export function tryFn<T, E>(
   fnOrOpts: (() => T) | { try: () => T; catch: (e: Error) => E },
+  catchFn?: (e: Error) => E,
 ): UnhandledError | E | T {
-  if (typeof fnOrOpts === 'function') {
-    try {
-      return fnOrOpts()
-    } catch (cause) {
-      if (!(cause instanceof Error)) {
-        throw cause
-      }
-      return new UnhandledError({ cause })
-    }
+  if (typeof fnOrOpts !== 'function') {
+    return tryFn(fnOrOpts.try, fnOrOpts.catch)
   }
-
   try {
-    return fnOrOpts.try()
+    return fnOrOpts()
   } catch (cause) {
     if (!(cause instanceof Error)) {
       throw cause
     }
-    return fnOrOpts.catch(cause)
+    if (catchFn) {
+      return catchFn(cause)
+    }
+    return new UnhandledError({ cause })
   }
 }
 
@@ -108,6 +103,11 @@ export function tryFn<T, E>(
  * ```
  */
 export function tryAsync<T>(fn: () => Promise<T>): Promise<UnhandledError | T>
+export function tryAsync<T, E>(
+  fn: () => Promise<T>,
+  catchFn: (e: Error) => E | Promise<E>,
+): Promise<E | T>
+/** @deprecated Use positional args: tryAsync(fn, catchFn) */
 export function tryAsync<T, E>(opts: {
   try: () => Promise<T>
   catch: (e: Error) => E | Promise<E>
@@ -116,24 +116,20 @@ export async function tryAsync<T, E>(
   fnOrOpts:
     | (() => Promise<T>)
     | { try: () => Promise<T>; catch: (e: Error) => E | Promise<E> },
+  catchFn?: (e: Error) => E | Promise<E>,
 ): Promise<UnhandledError | E | T> {
-  if (typeof fnOrOpts === 'function') {
-    try {
-      return await fnOrOpts()
-    } catch (cause) {
-      if (!(cause instanceof Error)) {
-        throw cause
-      }
-      return new UnhandledError({ cause })
-    }
+  if (typeof fnOrOpts !== 'function') {
+    return tryAsync(fnOrOpts.try, fnOrOpts.catch)
   }
-
   try {
-    return await fnOrOpts.try()
+    return await fnOrOpts()
   } catch (cause) {
     if (!(cause instanceof Error)) {
       throw cause
     }
-    return await fnOrOpts.catch(cause)
+    if (catchFn) {
+      return await catchFn(cause)
+    }
+    return new UnhandledError({ cause })
   }
 }

@@ -1147,12 +1147,10 @@ import * as errore from 'errore'
 function parseConfig(
   input: string
 ): ParseError | Config {
-  return errore.try({
-    try: () => JSON.parse(input) as Config,
-    catch: (e) => new ParseError({
-      reason: e.message
-    })
-  })
+  return errore.try(
+    () => JSON.parse(input) as Config,
+    (e) => new ParseError({ reason: e.message }),
+  )
 }
 
 const config = parseConfig(raw)
