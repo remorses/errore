@@ -62,7 +62,20 @@ console.log(user.name) // TypeScript knows: User
     await result.json() // TS knows result is Response here
     ```
 
-20. Always log errors that are not propagated — when an error branch doesn't `return` or `throw` the error (i.e. the error is intentionally swallowed), add a `console.warn` or `console.error` so failures are visible during debugging. Silent error swallowing makes bugs invisible:
+20. Always write `instanceof Error` early returns on one line — no `{` block, no extra lines. `if (x instanceof Error) return x` keeps the happy path readable and reduces visual noise. Only use a block when the branch has more than one statement:
+
+    ```ts
+    // good — one line, no block
+    if (result instanceof Error) return result
+    if (user instanceof Error) return user
+
+    // bad — block for a single return adds noise
+    if (result instanceof Error) {
+      return result
+    }
+    ```
+
+21. Always log errors that are not propagated — when an error branch doesn't `return` or `throw` the error (i.e. the error is intentionally swallowed), add a `console.warn` or `console.error` so failures are visible during debugging. Silent error swallowing makes bugs invisible:
 
     ```ts
     // BAD: error silently ignored — if sync fails you'll never know
