@@ -151,10 +151,7 @@ async function updateUser(
 app.post('/users/:id', async (req, res) => {
   const result = await updateUser(req.params.id, req.body)
 
-  if (result instanceof Error) {
-    // All errors have toResponse() from AppError base
-    return res.status(result.statusCode).json(result.toResponse())
-  }
+  if (result instanceof Error) return res.status(result.statusCode).json(result.toResponse())
 
   return res.json(result)
 })
@@ -229,9 +226,7 @@ Wrap errors with additional context while **preserving the original error** via 
 async function processUser(id: string): Promise<ServiceError | ProcessedUser> {
   const user = await getUser(id) // returns NotFoundError | User
 
-  if (user instanceof Error) {
-    return new ServiceError({ id, cause: user })
-  }
+  if (user instanceof Error) return new ServiceError({ id, cause: user })
 
   return process(user)
 }
@@ -359,10 +354,7 @@ Use **instanceof checks** to narrow union types:
 ```ts
 const result: NetworkError | User = await fetchUser(id)
 
-if (result instanceof Error) {
-  // result is NetworkError
-  return result
-}
+if (result instanceof Error) return result // result is NetworkError
 // result is User
 ```
 
@@ -538,10 +530,7 @@ TypeScript **narrows types** after `instanceof Error` checks:
 
 ```ts
 function example(result: NetworkError | User): string {
-  if (result instanceof Error) {
-    // TypeScript knows: result is NetworkError
-    return result.message
-  }
+  if (result instanceof Error) return result.message // TypeScript: result is NetworkError
   // TypeScript knows: result is User (Error excluded)
   return result.name
 }
@@ -575,9 +564,7 @@ function findUser(id: string): NotFoundError | User | null {
 const user = findUser('123')
 
 // Handle error first
-if (user instanceof Error) {
-  return user.message // TypeScript: user is NotFoundError
-}
+if (user instanceof Error) return user.message // TypeScript: user is NotFoundError
 
 // Handle null/missing case - use ?. and ?? naturally!
 const name = user?.name ?? 'Anonymous'

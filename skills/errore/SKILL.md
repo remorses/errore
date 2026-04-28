@@ -548,8 +548,7 @@ err instanceof Error // true
 ```ts
 async function legacyHandler(id: string) {
   const user = await getUser(id)
-  if (user instanceof Error)
-    throw new Error('Failed to get user', { cause: user })
+  if (user instanceof Error) throw new Error('Failed to get user', { cause: user })
   return user
 }
 ```

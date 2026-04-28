@@ -991,12 +991,8 @@ if (result instanceof Error) {
 const result = await fetchData({ signal }).catch(
   (e) => new FetchError({ cause: e }),
 )
-if (errore.isAbortError(result)) {
-  return 'Request timed out'
-}
-if (result instanceof Error) {
-  return `Failed: ${result.message}`
-}
+if (errore.isAbortError(result)) return 'Request timed out'
+if (result instanceof Error) return `Failed: ${result.message}`
 ```
 
 ### Don't reassign after narrowing
@@ -1004,17 +1000,13 @@ if (result instanceof Error) {
 ```ts
 // before — unnecessary reassignment
 const result = await fetch(url).catch((e) => new FetchError({ cause: e }))
-if (result instanceof Error) {
-  return `Failed: ${result.message}`
-}
+if (result instanceof Error) return `Failed: ${result.message}`
 const response = result // pointless — TS already knows result is Response
 await response.json()
 
 // after — just keep using the original variable
 const result = await fetch(url).catch((e) => new FetchError({ cause: e }))
-if (result instanceof Error) {
-  return `Failed: ${result.message}`
-}
+if (result instanceof Error) return `Failed: ${result.message}`
 await result.json() // TS knows result is Response here
 ```
 
