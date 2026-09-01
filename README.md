@@ -129,7 +129,9 @@ async function updateUser(
 ): Promise<NotFoundError | ValidationError | UnauthorizedError | User> {
   const session = await getSession()
   if (!session) {
-    return new UnauthorizedError({ message: 'Not logged in' })
+    return new UnauthorizedError({
+      message: 'Not logged in. Sign in at /login or run: mycli login',
+    })
   }
 
   const user = await db.users.find(userId)
@@ -156,6 +158,28 @@ app.post('/users/:id', async (req, res) => {
   return res.json(result)
 })
 ```
+
+## Hint a Solution
+
+User-facing error messages should include **how to fix** the problem, not only what went wrong. Agents and CLIs that consume your API can then self-correct instead of guessing.
+
+If the user is logged out, include the login URL or CLI command:
+
+```ts
+class UnauthorizedError extends errore.createTaggedError({
+  name: 'UnauthorizedError',
+  message: 'Not logged in. Sign in at $loginUrl or run: $loginCommand',
+}) {}
+
+if (!session) {
+  return new UnauthorizedError({
+    loginUrl: 'https://example.com',
+    loginCommand: 'mycli login',
+  })
+}
+```
+
+This applies to HTTP responses, CLI output, and any error a user or agent will read. Internal errors (DB failures, parse errors) can stay technical.
 
 ## API
 

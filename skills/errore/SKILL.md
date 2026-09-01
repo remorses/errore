@@ -93,6 +93,24 @@ console.log(user.name) // TypeScript knows: User
 
     > Propagated errors (`return error`) don't need logging — the caller handles them. But errors you choose to ignore must leave a trace. This applies to loops with `continue`, fallback branches, and any path where the error is intentionally dropped.
 
+22. Always hint a **solution** in user-facing error messages. Include a login URL, CLI command, or missing flag so agents and users can self-correct instead of guessing:
+
+    ```ts
+    class UnauthorizedError extends errore.createTaggedError({
+      name: 'UnauthorizedError',
+      message: 'Not logged in. Sign in at $loginUrl or run: $loginCommand',
+    }) {}
+
+    if (!session) {
+      return new UnauthorizedError({
+        loginUrl: 'https://example.com',
+        loginCommand: 'mycli login',
+      })
+    }
+    ```
+
+    This applies to HTTP responses, CLI output, and any error a user or agent will read. Internal errors (DB failures, parse errors) can stay technical.
+
 ## TypeScript Rules
 
 - **Object args over positional** — `({id, retries})` not `(id, retries)` for functions with 2+ params
