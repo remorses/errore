@@ -740,7 +740,7 @@ console.log("hello")
 arr.push(1)`
 
 // AI Agents skill install
-const codeSkillInstall = `npx skills add remorses/errore`
+const codeSkillInstall = `npx -y skills add remorses/errore -g -y`
 
 const codeAgentsMd = `This codebase uses the errore.org convention.
 ALWAYS read the errore skill before editing any code.`

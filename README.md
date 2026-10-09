@@ -31,7 +31,7 @@ npm install errore
 errore ships with a skill file that teaches AI coding agents the errore convention. Install it with:
 
 ```sh
-npx skills add remorses/errore
+npx -y skills add remorses/errore -g -y
 ```
 
 Then add this to your `AGENTS.md`:
